@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "uq_sent_message_mailbox_message_recipient" ON "sent_message" USING btree ("mailbox_id","message_id","recipient");

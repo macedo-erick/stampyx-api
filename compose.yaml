@@ -1,0 +1,230 @@
+name: stampyx
+
+networks:
+  stampyx:
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
+
+volumes:
+  postgres-data:
+  sieve-data:
+  attachments-data:
+  vmail-data:
+  rspamd-data:
+  mail-certs:
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    ports: ['127.0.0.1:5435:5432']
+    networks: [stampyx]
+    environment:
+      POSTGRES_DB: stampyx
+      POSTGRES_USER: stampyx
+      POSTGRES_PASSWORD: stampyx
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-keycloak-db.sql:/docker-entrypoint-initdb.d/init-keycloak-db.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U stampyx -d stampyx']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    restart: unless-stopped
+    command: ['start-dev', '--http-relative-path=/auth', '--import-realm']
+    ports: ['127.0.0.1:8093:8080']
+    networks: [stampyx]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KC_HOSTNAME_STRICT: 'false'
+      KC_HTTP_ENABLED: 'true'
+      KC_HEALTH_ENABLED: 'true'
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      STAMPYX_UI_ORIGIN: http://localhost:4202
+      STAMPYX_UI_BASE_URL: http://localhost:4202
+      STAMPYX_KEYCLOAK_ADMIN_CLIENT_SECRET: local-dev-secret
+    volumes:
+      # The auth repo owns the realm; this reaches into that checkout the way listryx does.
+      - ../../auth/realms/stampyx.json:/opt/keycloak/data/import/stampyx.json:ro
+      - ../../auth/themes/stampyx:/opt/keycloak/themes/stampyx:ro
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'exec 3<>/dev/tcp/127.0.0.1/9000; echo -e "GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n" >&3; grep -q "200 OK" <&3',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+
+  migrate:
+    build:
+      context: .
+      target: dev
+    command: ['yarn', 'db:migrate:dev']
+    restart: 'no'
+    networks: [stampyx]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: '5432'
+    env_file: [{ path: .env, required: false }]
+
+  api:
+    build:
+      context: .
+      target: dev
+    restart: unless-stopped
+    ports: ['127.0.0.1:8092:8080']
+    networks: [stampyx]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      dovecot:
+        condition: service_started
+      postfix:
+        condition: service_started
+    environment:
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: '8080'
+      # The issuer must be the exact string the browser sees; JWKS is fetched container-side,
+      # where localhost would not resolve to Keycloak.
+      KEYCLOAK_ISSUER_URI: http://localhost:8093/auth/realms/stampyx
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/auth/realms/stampyx/protocol/openid-connect/certs
+      KEYCLOAK_SERVER_URL: http://keycloak:8080/auth
+      STAMPYX_CORS_ORIGINS: http://localhost:4202
+      MAIL_SIEVE_DIR: /data/sieve
+      MAIL_ATTACHMENTS_DIR: /data/attachments
+      # The mail plane, same shape as production: submission over 587, IMAP over 143, and
+      # the Dovecot master user rather than any mailbox's own password.
+      MAIL_SMTP_HOST: postfix
+      MAIL_SMTP_PORT: '587'
+      MAIL_IMAP_HOST: dovecot
+      MAIL_IMAP_PORT: '143'
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME:-mail.stampyx.com}
+      MAIL_MASTER_USER: ${MAIL_MASTER_USER:-stampyx-api}
+      MAIL_MASTER_PASSWORD: ${MAIL_MASTER_PASSWORD:-local-dev-secret}
+      MAIL_INTERNAL_SECRET: ${MAIL_INTERNAL_SECRET:-local-dev-secret}
+      # Submission and IMAP both demand TLS, and the local certificate is self-signed, so
+      # Node needs it in its trust store or every send fails on verification instead of TLS.
+      NODE_EXTRA_CA_CERTS: /etc/letsencrypt/live/${MAIL_HOSTNAME:-mail.stampyx.com}/fullchain.pem
+      # Without a platform domain nothing is seeded verified, and send refuses before it
+      # ever reaches Postfix.
+      STAMPYX_PLATFORM_DOMAINS: ${STAMPYX_PLATFORM_DOMAINS:-stampyx.com}
+      LOG_PRETTY: 'true'
+      LOG_LEVEL: debug
+    volumes:
+      - ./src:/app/src
+      - ./drizzle:/app/drizzle
+      - sieve-data:/data/sieve
+      - attachments-data:/data/attachments
+      - mail-certs:/etc/letsencrypt:ro
+    env_file: [{ path: .env, required: false }]
+
+  # ---------------------------------------------------------------------------------------
+  # The mail plane. Production runs these three from Artifact Registry images; here they are
+  # built from stampyx-infra/mail/docker and read the very same configuration files, mounted
+  # from stampyx-infra/mail/, so a change there is exercised locally before it is deployed.
+  # ---------------------------------------------------------------------------------------
+
+  mail-certs:
+    build:
+      context: ../stampyx-infra/mail/docker
+      dockerfile: Dockerfile.dovecot
+    entrypoint: ['/usr/local/bin/dev-cert']
+    restart: 'no'
+    environment:
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME:-mail.stampyx.com}
+    volumes:
+      - mail-certs:/etc/letsencrypt
+
+  postfix:
+    build:
+      context: ../stampyx-infra/mail/docker
+      dockerfile: Dockerfile.postfix
+    restart: unless-stopped
+    # High ports: only for pointing a real client at the stack. The API reaches Postfix over
+    # the compose network, where the port is the production 587.
+    ports: ['127.0.0.1:2525:25', '127.0.0.1:1587:587', '127.0.0.1:1465:465']
+    networks: [stampyx]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      mail-certs:
+        condition: service_completed_successfully
+    environment:
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME:-mail.stampyx.com}
+      DB_HOST: postgres
+      DB_NAME: stampyx
+      DB_USER: ${POSTGRES_USER:-stampyx}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-stampyx}
+      API_INTERNAL_URL: http://api:8080
+      MAIL_INTERNAL_SECRET: ${MAIL_INTERNAL_SECRET:-local-dev-secret}
+    volumes:
+      - ../stampyx-infra/mail/postfix:/etc/stampyx/postfix:ro
+      - mail-certs:/etc/letsencrypt:ro
+
+  dovecot:
+    build:
+      context: ../stampyx-infra/mail/docker
+      dockerfile: Dockerfile.dovecot
+    restart: unless-stopped
+    ports: ['127.0.0.1:1143:143', '127.0.0.1:1993:993']
+    networks: [stampyx]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      mail-certs:
+        condition: service_completed_successfully
+    environment:
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME:-mail.stampyx.com}
+      DB_HOST: postgres
+      DB_NAME: stampyx
+      DB_USER: ${POSTGRES_USER:-stampyx}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-stampyx}
+      API_INTERNAL_URL: http://api:8080
+      MAIL_INTERNAL_SECRET: ${MAIL_INTERNAL_SECRET:-local-dev-secret}
+      MAIL_MASTER_USER: ${MAIL_MASTER_USER:-stampyx-api}
+      MAIL_MASTER_PASSWORD: ${MAIL_MASTER_PASSWORD:-local-dev-secret}
+    volumes:
+      - ../stampyx-infra/mail/dovecot:/etc/stampyx/dovecot:ro
+      - vmail-data:/data/vmail
+      # The same volume the API writes Sieve scripts into.
+      - sieve-data:/data/sieve
+      - mail-certs:/etc/letsencrypt:ro
+
+  rspamd:
+    build:
+      context: ../stampyx-infra/mail/docker
+      dockerfile: Dockerfile.rspamd
+    restart: unless-stopped
+    networks: [stampyx]
+    volumes:
+      - ../stampyx-infra/mail/rspamd/local.d:/etc/rspamd/local.d:ro
+      - rspamd-data:/var/lib/rspamd

@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787674099618,
+      "tag": "0000_create_stampyx_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787682991427,
+      "tag": "0001_sent_message_natural_key",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787690033207,
+      "tag": "0002_platform_domains_and_mailbox_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787694793818,
+      "tag": "0003_attachments_by_message",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787700261925,
+      "tag": "0004_message_recipient_and_thread",
+      "breakpoints": true
+    }
+  ]
+}
