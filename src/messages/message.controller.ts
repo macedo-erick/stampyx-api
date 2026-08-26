@@ -24,10 +24,12 @@ import {
   type MessageDetail,
   type MessageSummary,
   type MoveMessageRequest,
+  type SaveDraftRequest,
   type SendMessageRequest,
   type SetReadRequest,
   listMessagesSchema,
   moveMessageSchema,
+  saveDraftSchema,
   sendMessageSchema,
   setReadSchema,
 } from './dto';
@@ -64,6 +66,15 @@ export class MessageController {
     });
   }
 
+  @Get(':id/thread')
+  thread(
+    @CurrentAccount() accountId: string,
+    @Param('mailboxId', ParseUUIDPipe) mailboxId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<MessageDetail[]> {
+    return this.service.thread(accountId, mailboxId, id);
+  }
+
   @Get(':id')
   read(
     @CurrentAccount() accountId: string,
@@ -80,7 +91,7 @@ export class MessageController {
   saveDraft(
     @CurrentAccount() accountId: string,
     @Param('mailboxId', ParseUUIDPipe) mailboxId: string,
-    @Body(zodBody(sendMessageSchema)) body: SendMessageRequest,
+    @Body(zodBody(saveDraftSchema)) body: SaveDraftRequest,
   ): Promise<void> {
     return this.service.saveDraft(accountId, mailboxId, body);
   }

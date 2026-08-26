@@ -28,6 +28,9 @@ beforeAll(async () => {
 
   const client = harness.app.get(ImapClient);
   vi.spyOn(client, 'listFolders').mockImplementation(() => Promise.resolve([...tree]));
+  // Counts come from the server now. An empty answer leaves the projection's own counts in
+  // place, which is what the assertions below are about.
+  vi.spyOn(client, 'statusOf').mockResolvedValue(new Map());
   vi.spyOn(client, 'createFolder').mockImplementation((_address, path) => {
     tree.push({ path, delimiter, specialUse: null });
 

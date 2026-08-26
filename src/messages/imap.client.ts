@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ImapFlow } from 'imapflow';
-import { simpleParser } from 'mailparser';
+import { type ParsedMail, simpleParser } from 'mailparser';
 
 import { CONFIG, type Config } from '../config';
 
@@ -13,11 +13,23 @@ export interface FetchedAttachment {
 export interface ParsedBody {
   readonly html: string | null;
   readonly text: string | null;
+  // Reopening a draft has to put the recipients back in the fields, and the projection does
+  // not keep them: the message itself is the only place they exist.
+  readonly to: readonly string[];
+  readonly cc: readonly string[];
   readonly attachments: readonly {
     filename: string;
     contentType: string;
     size: number;
   }[];
+}
+
+// What a folder holds right now, without reading a single message. STATUS is the cheap call
+// IMAP provides for exactly this, which is what lets a badge stay honest for a folder
+// nobody has opened.
+export interface FolderStatus {
+  readonly total: number;
+  readonly unread: number;
 }
 
 // The server decides both of these. Hard-coding a separator is how a hierarchy silently
@@ -36,12 +48,20 @@ export interface ImapMessage {
   readonly to: readonly string[];
   readonly cc: readonly string[];
   readonly subject: string | null;
+  // The parent this message answers, so a mirrored conversation keeps its shape.
+  readonly inReplyTo: string | null;
   readonly date: string;
   readonly seen: boolean;
 }
 
 export interface ImapOperations {
   fetchBody(address: string, folder: string, uid: number): Promise<ParsedBody | null>;
+  fetchBodies(
+    address: string,
+    folder: string,
+    uids: readonly number[],
+  ): Promise<Map<number, ParsedBody>>;
+  statusOf(address: string, paths: readonly string[]): Promise<Map<string, FolderStatus>>;
   fetchAttachment(
     address: string,
     folder: string,
@@ -76,15 +96,63 @@ export class ImapClient implements ImapOperations {
 
       const parsed = await simpleParser(message.source);
 
-      return {
-        html: typeof parsed.html === 'string' ? parsed.html : null,
-        text: parsed.text ?? null,
-        attachments: parsed.attachments.map((attachment) => ({
-          filename: attachment.filename ?? 'attachment',
-          contentType: attachment.contentType,
-          size: attachment.size,
-        })),
-      };
+      return toParsedBody(parsed);
+    });
+  }
+
+  // One connection for the whole conversation. Reading a thread message by message opened
+  // an IMAP session per message, which is the wrong shape for a pane that shows five.
+  async fetchBodies(
+    address: string,
+    folder: string,
+    uids: readonly number[],
+  ): Promise<Map<number, ParsedBody>> {
+    if (uids.length === 0) {
+      return new Map();
+    }
+
+    return this.withMailbox(address, folder, async (client) => {
+      const bodies = new Map<number, ParsedBody>();
+
+      for await (const message of client.fetch(
+        uids.join(','),
+        { uid: true, source: true },
+        { uid: true },
+      )) {
+        if (message.source === undefined) {
+          continue;
+        }
+
+        bodies.set(message.uid, toParsedBody(await simpleParser(message.source)));
+      }
+
+      return bodies;
+    });
+  }
+
+  // Counted by the server, not by the projection: a badge that only moved once its folder
+  // was opened was reporting the last sync rather than the mailbox.
+  async statusOf(address: string, paths: readonly string[]): Promise<Map<string, FolderStatus>> {
+    if (paths.length === 0) {
+      return new Map();
+    }
+
+    return this.connected(address, async (client) => {
+      const counts = new Map<string, FolderStatus>();
+
+      for (const path of paths) {
+        try {
+          const status = await client.status(path, { messages: true, unseen: true });
+
+          counts.set(path, { total: status.messages ?? 0, unread: status.unseen ?? 0 });
+        } catch {
+          // A folder that cannot be counted is not a reason to leave the rest uncounted:
+          // the caller falls back to what the projection knows for this one.
+          continue;
+        }
+      }
+
+      return counts;
     });
   }
 
@@ -138,6 +206,7 @@ export class ImapClient implements ImapOperations {
           to: (envelope?.to ?? []).map((entry) => entry.address ?? '').filter((it) => it !== ''),
           cc: (envelope?.cc ?? []).map((entry) => entry.address ?? '').filter((it) => it !== ''),
           subject: envelope?.subject ?? null,
+          inReplyTo: envelope?.inReplyTo ?? null,
           date: (envelope?.date ?? new Date()).toISOString(),
           seen: message.flags?.has('\\Seen') ?? false,
         });
@@ -272,4 +341,29 @@ export class ImapClient implements ImapOperations {
       await client.logout().catch(() => undefined);
     }
   }
+}
+
+function toParsedBody(parsed: ParsedMail): ParsedBody {
+  return {
+    html: typeof parsed.html === 'string' ? parsed.html : null,
+    text: parsed.text ?? null,
+    to: addressesOf(parsed.to),
+    cc: addressesOf(parsed.cc),
+    attachments: parsed.attachments.map((attachment) => ({
+      filename: attachment.filename ?? 'attachment',
+      contentType: attachment.contentType,
+      size: attachment.size,
+    })),
+  };
+}
+
+// mailparser hands back either one header or an array of them, depending on how the message
+// was written; both shapes carry the same list underneath.
+function addressesOf(field: ParsedMail['to']): string[] {
+  const groups = field === undefined ? [] : Array.isArray(field) ? field : [field];
+
+  return groups
+    .flatMap((group) => group.value)
+    .map((entry) => entry.address ?? '')
+    .filter((entry) => entry !== '');
 }

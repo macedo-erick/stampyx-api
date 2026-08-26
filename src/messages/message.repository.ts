@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, notInArray, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
 import { DATABASE, type Database } from '../database/db';
 import { type ReceivedMessage, receivedMessage, sentMessage } from '../database/schema';
@@ -87,13 +87,17 @@ export class MessageRepository {
         .insert(receivedMessage)
         .values([...rows])
         .onConflictDoUpdate({
-          target: [receivedMessage.mailboxId, receivedMessage.messageId],
+          target: [receivedMessage.mailboxId, receivedMessage.folder, receivedMessage.messageId],
           set: {
             folder: sql`excluded.folder`,
             imapUid: sql`excluded.imap_uid`,
             read: sql`excluded.read`,
             recipient: sql`excluded.recipient`,
             subject: sql`excluded.subject`,
+            inReplyTo: sql`excluded.in_reply_to`,
+            // Self-healing: rows mirrored before the root was derived carry themselves as
+            // their own thread, and re-listing the folder puts them back in the conversation.
+            threadId: sql`excluded.thread_id`,
           },
         });
     }
@@ -111,6 +115,30 @@ export class MessageRepository {
           keep.length === 0 ? sql`true` : notInArray(receivedMessage.messageId, keep),
         ),
       );
+  }
+
+  // The threads a batch of parents belong to, so mirrored replies inherit the same root
+  // without one query per message.
+  async threadsOf(mailboxId: string, messageIds: readonly string[]): Promise<Map<string, string>> {
+    if (messageIds.length === 0) {
+      return new Map();
+    }
+
+    const rows = await this.db
+      .selectDistinct({ messageId: receivedMessage.messageId, threadId: receivedMessage.threadId })
+      .from(receivedMessage)
+      .where(
+        and(
+          eq(receivedMessage.mailboxId, mailboxId),
+          inArray(receivedMessage.messageId, [...new Set(messageIds)]),
+        ),
+      );
+
+    return new Map(
+      rows
+        .filter((row): row is { messageId: string; threadId: string } => row.threadId !== null)
+        .map((row) => [row.messageId, row.threadId] as const),
+    );
   }
 
   // The conversation the parent belongs to, so a reply inherits the same root.

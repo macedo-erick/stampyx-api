@@ -15,9 +15,12 @@ import { MessageService } from './message.service';
 let harness: TestHarness;
 let imap: {
   fetchBody: MockInstance<ImapClient['fetchBody']>;
+  fetchBodies: MockInstance<ImapClient['fetchBodies']>;
   setSeen: MockInstance<ImapClient['setSeen']>;
   move: MockInstance<ImapClient['move']>;
   remove: MockInstance<ImapClient['remove']>;
+  append: MockInstance<ImapClient['append']>;
+  listMessages: MockInstance<ImapClient['listMessages']>;
 };
 
 beforeAll(async () => {
@@ -33,11 +36,21 @@ beforeAll(async () => {
     fetchBody: vi.spyOn(client, 'fetchBody').mockResolvedValue({
       html: '<p>Hello <script>alert(1)</script></p>',
       text: 'Hello',
+      to: ['erick@example.test'],
+      cc: [],
       attachments: [],
     }),
+    fetchBodies: vi.spyOn(client, 'fetchBodies').mockResolvedValue(new Map()),
     setSeen: vi.spyOn(client, 'setSeen').mockResolvedValue(undefined),
     move: vi.spyOn(client, 'move').mockResolvedValue(undefined),
     remove: vi.spyOn(client, 'remove').mockResolvedValue(undefined),
+    append: vi.spyOn(client, 'append').mockResolvedValue(undefined),
+    // Every listing reconciles against the server first. These tests seed the projection
+    // directly, so the default is an unreadable source - the case where the mirror must
+    // serve what it already knows rather than prune it. Mirror tests override this.
+    listMessages: vi
+      .spyOn(client, 'listMessages')
+      .mockRejectedValue(new Error('imap unavailable in tests')),
   };
 
   // The service asks the server which folder carries \Sent and which carries \Trash, so a
@@ -53,9 +66,12 @@ beforeAll(async () => {
 
 beforeEach(() => {
   imap.fetchBody.mockClear();
+  imap.fetchBodies.mockClear();
   imap.setSeen.mockClear();
   imap.move.mockClear();
   imap.remove.mockClear();
+  imap.append.mockClear();
+  imap.listMessages.mockClear();
 });
 
 afterAll(async () => {
@@ -179,7 +195,7 @@ it('marks a message read on both sides when it is opened', async () => {
   expect(row?.read).toBe(true);
 });
 
-it('clears the stale UID when a message moves folder', async () => {
+it('drops the projection row when a message moves folder', async () => {
   const { sub, mailboxId } = await newMailbox('msg-move.com');
   const id = await seed(mailboxId);
 
@@ -196,11 +212,11 @@ it('clears the stale UID when a message moves folder', async () => {
   expect(moved.status).toBe(204);
   expect(imap.move).toHaveBeenCalledWith('erick@msg-move.com', 'INBOX', 42, 'Archive');
 
-  const [row] = await harness.db.select().from(receivedMessage).where(eq(receivedMessage.id, id));
+  // Carrying the row over would collide with any copy the target already holds - the same
+  // Message-ID is genuinely in Sent and in INBOX. IMAP has it; listing Archive mirrors it back.
+  const rows = await harness.db.select().from(receivedMessage).where(eq(receivedMessage.id, id));
 
-  expect(row?.folder).toBe('Archive');
-  // The UID only means anything inside its old folder.
-  expect(row?.imapUid).toBeNull();
+  expect(rows).toHaveLength(0);
 });
 
 it('leaves Postgres alone when the IMAP side of a move fails', async () => {
@@ -237,9 +253,132 @@ it('deletes on both sides', async () => {
   expect(imap.move).toHaveBeenCalled();
   expect(imap.remove).not.toHaveBeenCalled();
 
-  const [row] = await harness.db.select().from(receivedMessage).where(eq(receivedMessage.id, id));
+  const rows = await harness.db.select().from(receivedMessage).where(eq(receivedMessage.id, id));
 
-  expect(row?.folder).toBe('Trash');
+  expect(rows).toHaveLength(0);
+});
+
+it('trashes a message whose Message-ID is already in Trash', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-dupe-trash.com');
+  const shared = `<${randomUUID()}@example.test>`;
+
+  // A message sent to yourself: one Message-ID, a copy in INBOX and a copy in Sent. Deleting
+  // the second one used to fail the unique key on (mailbox, folder, message_id).
+  await seed(mailboxId, { messageId: shared, folder: 'Trash' });
+  const id = await seed(mailboxId, { messageId: shared, folder: 'Sent' });
+
+  const removed = await call(harness, sub, 'DELETE', `/api/mailboxes/${mailboxId}/messages/${id}`);
+
+  expect(removed.status).toBe(204);
+});
+
+it('collapses two copies of one Message-ID in a folder instead of failing the listing', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-dupes.com');
+  const shared = '<same-id@example.test>';
+
+  // Dovecot is happy to hold both; Postgres refuses to touch one key twice in an upsert,
+  // which took the whole folder listing down with a 500.
+  imap.listMessages.mockResolvedValueOnce([
+    {
+      uid: 7,
+      messageId: shared,
+      from: 'a@example.test',
+      to: [],
+      cc: [],
+      subject: 'older',
+      inReplyTo: null,
+      date: new Date(Date.now() - 60_000).toISOString(),
+      seen: false,
+    },
+    {
+      uid: 9,
+      messageId: shared,
+      from: 'a@example.test',
+      to: [],
+      cc: [],
+      subject: 'newer',
+      inReplyTo: null,
+      date: new Date().toISOString(),
+      seen: false,
+    },
+  ]);
+
+  const listed = await call<{ content: MessageSummary[]; totalElements: number }>(
+    harness,
+    sub,
+    'GET',
+    `/api/mailboxes/${mailboxId}/messages?folder=Trash`,
+  );
+
+  expect(listed.status).toBe(200);
+  expect(listed.body.totalElements).toBe(1);
+  expect(listed.body.content[0]?.subject).toBe('newer');
+});
+
+it('mirrors a reply into the conversation its parent belongs to', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-thread-sync.com');
+  const root = '<root@example.test>';
+
+  await seed(mailboxId, { messageId: root, threadId: root, folder: 'INBOX' });
+
+  imap.listMessages.mockResolvedValueOnce([
+    {
+      uid: 3,
+      messageId: '<reply@example.test>',
+      from: 'a@example.test',
+      to: [],
+      cc: [],
+      subject: 'Re: hi',
+      inReplyTo: root,
+      date: new Date().toISOString(),
+      seen: true,
+    },
+  ]);
+
+  await call(harness, sub, 'GET', `/api/mailboxes/${mailboxId}/messages?folder=Archive`);
+
+  const [row] = await harness.db
+    .select()
+    .from(receivedMessage)
+    .where(eq(receivedMessage.messageId, '<reply@example.test>'));
+
+  expect(row?.threadId).toBe(root);
+});
+
+it('returns the whole conversation with bodies, oldest first', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-thread.com');
+  const root = '<conv@example.test>';
+
+  const first = await seed(mailboxId, {
+    messageId: root,
+    threadId: root,
+    subject: 'first',
+    receivedAt: new Date(Date.now() - 60_000),
+  });
+  const second = await seed(mailboxId, {
+    messageId: '<conv-2@example.test>',
+    threadId: root,
+    subject: 'second',
+  });
+
+  imap.fetchBodies.mockResolvedValueOnce(
+    new Map([
+      [42, { html: null, text: 'body', to: ['erick@msg-thread.com'], cc: [], attachments: [] }],
+    ]),
+  );
+
+  const thread = await call<MessageDetail[]>(
+    harness,
+    sub,
+    'GET',
+    `/api/mailboxes/${mailboxId}/messages/${second}/thread`,
+  );
+
+  expect(thread.status).toBe(200);
+  expect(thread.body.map((row) => row.id)).toEqual([first, second]);
+  expect(thread.body.map((row) => row.text)).toEqual(['body', 'body']);
+  // One connection for the conversation, not one per message.
+  expect(imap.fetchBodies).toHaveBeenCalledTimes(1);
 });
 
 it('destroys a message that was already in Trash', async () => {
@@ -306,6 +445,45 @@ it('refuses a send once the warmup cap is spent, before reaching the MTA', async
 
   expect(statuses[20]).toBe(429);
   expect(send).toHaveBeenCalled();
+});
+
+it('lists a message sent to yourself once, not once per folder', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-thread-dupe.com');
+  const root = '<self@example.test>';
+
+  // Delivered to INBOX and filed in Sent: two rows, one Message-ID. Both used to show.
+  const inbox = await seed(mailboxId, {
+    messageId: root,
+    threadId: root,
+    folder: 'INBOX',
+    subject: 'to myself',
+  });
+  await seed(mailboxId, { messageId: root, threadId: root, folder: 'Sent', subject: 'to myself' });
+
+  const thread = await call<MessageDetail[]>(
+    harness,
+    sub,
+    'GET',
+    `/api/mailboxes/${mailboxId}/messages/${inbox}/thread`,
+  );
+
+  expect(thread.status).toBe(200);
+  expect(thread.body).toHaveLength(1);
+  // The copy in the folder being read is the one that stays.
+  expect(thread.body[0]?.id).toBe(inbox);
+});
+
+it('saves a draft that has no recipient yet', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-draft.com');
+
+  // Half a draft is the normal state of one: a subject and a paragraph, nobody in To yet.
+  const saved = await call(harness, sub, 'POST', `/api/mailboxes/${mailboxId}/messages/drafts`, {
+    subject: 'Half written',
+    text: 'to be continued',
+  });
+
+  expect(saved.status).toBe(204);
+  expect(imap.append).toHaveBeenCalled();
 });
 
 it('validates recipients', async () => {

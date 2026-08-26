@@ -26,6 +26,14 @@ export const sendMessageSchema = z.object({
 });
 export type SendMessageRequest = z.infer<typeof sendMessageSchema>;
 
+// A draft is unfinished by definition: half the time it is a subject and a paragraph with
+// nobody in the To field yet. Requiring a recipient here made saving one impossible, which
+// is exactly when a draft is worth keeping.
+export const saveDraftSchema = sendMessageSchema.extend({
+  to: z.array(address).max(50).default([]),
+});
+export type SaveDraftRequest = z.infer<typeof saveDraftSchema>;
+
 export const moveMessageSchema = z.object({
   folder: z.string().trim().min(1).max(255),
 });

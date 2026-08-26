@@ -68,7 +68,7 @@ export class MailController {
         threadId,
       })
       .onConflictDoNothing({
-        target: [receivedMessage.mailboxId, receivedMessage.messageId],
+        target: [receivedMessage.mailboxId, receivedMessage.folder, receivedMessage.messageId],
       })
       .returning();
 
