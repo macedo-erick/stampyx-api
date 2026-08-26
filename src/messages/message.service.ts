@@ -575,7 +575,10 @@ function toSummary(row: ReceivedMessage): MessageSummary {
 // One message, two rows: mail you send to yourself is delivered to INBOX and filed in Sent
 // under a single Message-ID, and the conversation listed both, so every self-addressed
 // message appeared twice. The copy in the folder being read is the one that survives.
-function dedupeThread(rows: readonly ReceivedMessage[], opened: ReceivedMessage): ReceivedMessage[] {
+function dedupeThread(
+  rows: readonly ReceivedMessage[],
+  opened: ReceivedMessage,
+): ReceivedMessage[] {
   const kept = new Map<string, ReceivedMessage>();
 
   for (const row of rows) {
