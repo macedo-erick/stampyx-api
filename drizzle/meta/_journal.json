@@ -36,6 +36,20 @@
       "when": 1787700261925,
       "tag": "0004_message_recipient_and_thread",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787700510501,
+      "tag": "0005_backfill_thread_root",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787700764674,
+      "tag": "0006_message_key_includes_folder",
+      "breakpoints": true
     }
   ]
 }

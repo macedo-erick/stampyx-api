@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 
 import { MailboxRepository } from '../mailboxes/mailbox.repository';
-import type { ImapFolder } from '../messages/imap.client';
+import type { FolderStatus, ImapFolder } from '../messages/imap.client';
 import { ImapClient } from '../messages/imap.client';
 import type { CreateFolderRequest, FolderResponse } from './dto';
 import { FolderRepository } from './folder.repository';
@@ -38,23 +38,51 @@ export class FolderService {
       (await this.repository.ruleTargets(mailboxId)).map((row) => [row.folder, row.total] as const),
     );
 
+    // The server's own count, for every folder at once. The projection only knows a folder
+    // that has been listed at least once, which is why a badge used to sit still until you
+    // opened the folder it was counting.
+    const live = await this.liveCounts(address, folders);
+
     return folders
       .map((folder) => {
         const seen = counts.get(folder.path);
+        const now = live.get(folder.path);
         const cut = folder.path.lastIndexOf(folder.delimiter);
 
         return {
           path: folder.path,
           name: cut === -1 ? folder.path : folder.path.slice(cut + 1),
           parent: cut === -1 ? null : folder.path.slice(0, cut),
-          total: seen?.total ?? 0,
-          unread: seen?.unread ?? 0,
+          total: now?.total ?? seen?.total ?? 0,
+          unread: now?.unread ?? seen?.unread ?? 0,
           system: isSystem(folder),
           specialUse: folder.specialUse,
           ruleCount: rules.get(folder.path) ?? 0,
         };
       })
       .sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  // Best effort: a folder list that loses its badges is a nuisance, a folder list that
+  // fails to load is a broken panel. The projection's counts stand in.
+  private async liveCounts(
+    address: string,
+    folders: readonly ImapFolder[],
+  ): Promise<Map<string, FolderStatus>> {
+    try {
+      return await this.imap.statusOf(
+        address,
+        folders.map((folder) => folder.path),
+      );
+    } catch (error) {
+      this.logger.warn({
+        event: 'folder.status_unavailable',
+        address,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+
+      return new Map();
+    }
   }
 
   async create(

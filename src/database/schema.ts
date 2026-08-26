@@ -190,7 +190,13 @@ export const receivedMessage = pgTable(
       table.folder,
       table.receivedAt.desc(),
     ),
-    uniqueIndex('uq_received_message_mailbox_message_id').on(table.mailboxId, table.messageId),
+    // Folder is part of the key: a message sent to yourself is genuinely in INBOX and in
+    // Sent, with one Message-ID. Keying without the folder let one copy overwrite the other.
+    uniqueIndex('uq_received_message_mailbox_folder_message_id').on(
+      table.mailboxId,
+      table.folder,
+      table.messageId,
+    ),
     index('idx_received_message_thread').on(table.mailboxId, table.threadId),
     check(
       'received_message_manual_classification_check',
