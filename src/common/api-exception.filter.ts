@@ -4,34 +4,24 @@ import {
   type ExceptionFilter,
   HttpException,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 
+import { recordFailure } from '../logging';
 import type { ApiError } from './api-error';
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(ApiExceptionFilter.name);
-
   catch(exception: unknown, host: ArgumentsHost): void {
     const context = host.switchToHttp();
     const response = context.getResponse<Response>();
-    const request = context.getRequest<Request>();
 
     const status: HttpStatus =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const message = this.messageOf(exception, status);
-    const where = `${request.method} ${request.url}`;
 
-    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      this.logger.error(`${where} failed: ${message}`, this.stackOf(exception));
-    } else if (status === HttpStatus.FORBIDDEN || status === HttpStatus.CONFLICT) {
-      this.logger.warn(`${where}: ${message}`);
-    } else {
-      this.logger.debug(`${where}: ${message}`);
-    }
+    recordFailure(response, status, exception, message);
 
     const body: ApiError = {
       timestamp: new Date().toISOString(),
@@ -65,10 +55,6 @@ export class ApiExceptionFilter implements ExceptionFilter {
     }
 
     return 'An unexpected error occurred';
-  }
-
-  private stackOf(exception: unknown): string | undefined {
-    return exception instanceof Error ? exception.stack : undefined;
   }
 }
 
