@@ -10,8 +10,6 @@ export interface OwnedMailbox extends Mailbox {
   readonly domainVerifiedAt: Date | null;
 }
 
-// What PrincipalGuard needs to judge a mailbox session, mirroring v_dovecot_users: what the
-// mail server would refuse, the panel refuses too.
 export interface MailboxStanding extends OwnedMailbox {
   readonly domainActive: boolean;
   readonly accountStatus: string;
@@ -31,8 +29,6 @@ export class MailboxRepository {
     return this.select().where(eq(mailbox.accountId, accountId)).orderBy(mailbox.localPart);
   }
 
-  // Ownership is a join predicate, so someone else's row never comes back. It hangs off the
-  // mailbox, not the domain: a platform mailbox belongs to someone who owns no domain.
   async findOwned(accountId: string, id: string): Promise<OwnedMailbox | null> {
     const [row] = await this.select()
       .where(and(eq(mailbox.id, id), eq(mailbox.accountId, accountId)))
@@ -41,7 +37,6 @@ export class MailboxRepository {
     return row ?? null;
   }
 
-  // The login lookup, so deliberately not account-scoped.
   async findByAddress(localPart: string, domainName: string): Promise<MailboxStanding | null> {
     const [row] = await this.selectStanding()
       .where(and(eq(mailbox.localPart, localPart), eq(domain.name, domainName)))
@@ -66,7 +61,6 @@ export class MailboxRepository {
     return row !== undefined;
   }
 
-  // Not account-scoped: the Sieve reconciler runs at boot for nobody. Nothing request-facing may use it.
   async listAllActive(): Promise<OwnedMailbox[]> {
     return this.select().where(eq(mailbox.active, true));
   }

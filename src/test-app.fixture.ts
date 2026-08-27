@@ -13,7 +13,6 @@ import { DATABASE, type Database, createDatabase } from './database/db';
 import { MIGRATIONS_FOLDER } from './database/migrate';
 import { account } from './database/schema';
 
-// Stands in for JwtGuard with the same two identities; PrincipalGuard still decides standing.
 export class FakeAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
@@ -126,7 +125,6 @@ export interface TestHarness {
   readonly app: INestApplication;
   readonly db: Database;
   readonly url: string;
-  // A bare `sub` is not enough here: routes resolve it to an `account` row first.
   newAccount(status?: AccountStatus): Promise<TestAccount>;
   close(): Promise<void>;
 }
@@ -152,7 +150,6 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestHa
   const moduleRef = await builder.compile();
 
   const app = moduleRef.createNestApplication({ rawBody: true });
-  // Must mirror main.ts, or every /internal test 404s for an unrelated reason.
   app.setGlobalPrefix('api', { exclude: ['health', 'metrics', 'internal/(.*)'] });
   await app.init();
   await app.listen(0);

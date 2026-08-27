@@ -1,10 +1,7 @@
 import { z } from 'zod';
 
-// Typed into mail clients, not a Keycloak-backed browser, so nothing else enforces length.
-// 12 matches the realm policy.
 const password = z.string().min(12).max(200);
 
-// RFC 5321 caps the local part at 64 octets; the dot rules are RFC 5322.
 const localPart = z
   .string()
   .trim()
@@ -34,9 +31,6 @@ export interface MailboxResponse {
   readonly quotaMb: number;
   readonly active: boolean;
   readonly createdAt: string;
-  // An address on a domain the platform owns, so the panel hides DNS and domain controls.
   readonly platform: boolean;
-  // False while the domain is unverified: the views keep it out of Dovecot until then, and
-  // the panel needs to say so rather than let someone debug an impossible login.
   readonly deliverable: boolean;
 }

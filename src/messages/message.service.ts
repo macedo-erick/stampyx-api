@@ -35,7 +35,6 @@ import { ImapClient } from './imap.client';
 import { MessageRepository } from './message.repository';
 import { sanitizeMessageHtml } from './sanitize';
 
-// Past this a thread is an archive: the newest carry bodies, the rest stay listed.
 const THREAD_BODY_LIMIT = 25;
 
 @Injectable()
@@ -59,9 +58,6 @@ export class MessageService {
   ): Promise<PageResponse<MessageSummary>> {
     const mailbox = await this.requireMailbox(accountId, mailboxId);
 
-    // A mirror, not a second source of truth: Sent and Drafts are never reported, and any folder
-    // drifts as soon as another client touches it. Reconciling on the way in is what stopped the
-    // panel showing an empty folder while the server held mail.
     await this.syncFolder(mailbox, mailboxId, query.folder);
 
     const { rows, total } = await this.repository.listFolder(
@@ -93,7 +89,6 @@ export class MessageService {
     const mailbox = await this.requireMailbox(accountId, mailboxId);
     const row = await this.requireMessage(mailboxId, id);
 
-    // IMAP first: if it fails, Postgres must not claim a state the mail server disagrees with.
     if (row.imapUid !== null) {
       await this.imap.setSeen(address(mailbox), row.folder, row.imapUid, read);
     }
@@ -111,14 +106,10 @@ export class MessageService {
       await this.imap.move(address(mailbox), row.folder, uid, folder);
     }
 
-    // The row goes rather than moves: carrying it over collided with the copy the target may
-    // already hold. The mirror puts it back when that folder is next listed.
     await this.repository.delete(id);
     this.logger.log({ event: 'message.moved', messageId: id, folder });
   }
 
-  // Delete means Trash; only a message already there is expunged. The old path was permanent,
-  // and skipped IMAP whenever imapUid was null, which it always was.
   async remove(accountId: string, mailboxId: string, id: string): Promise<void> {
     const mailbox = await this.requireMailbox(accountId, mailboxId);
     const row = await this.requireMessage(mailboxId, id);
@@ -130,7 +121,6 @@ export class MessageService {
         await this.imap.move(address(mailbox), row.folder, uid, trash);
       }
 
-      // Dropped, not re-filed: Trash may already hold this Message-ID, and two cannot share the key.
       await this.repository.delete(id);
       this.logger.log({ event: 'message.trashed', messageId: id });
 
@@ -156,10 +146,8 @@ export class MessageService {
       throw new ForbiddenException('This domain is not verified yet, so it cannot send');
     }
 
-    // Before the allowance is spent: an unknown attachment id must not cost a daily send.
     const attached = await this.attachments.claim(mailboxId, input.attachmentIds);
 
-    // Consumed before handing anything to the MTA, so a refused send never leaves the box.
     await this.warmup.consumeAllowance(accountId);
 
     const from = address(mailbox);
@@ -176,13 +164,11 @@ export class MessageService {
       },
     });
 
-    // Composed once: the copy filed in Sent is byte-for-byte what left.
     const raw = await this.compose(mailbox, messageId, input, attached);
 
     try {
       await transport.sendMail({ envelope: { from, to: recipients }, raw });
     } catch (error) {
-      // An unreachable MTA is operational, not a bad request; a bare 500 sends on-call reading logs.
       if (isUnreachable(error)) {
         const where = `${this.config.MAIL_SMTP_HOST}:${String(this.config.MAIL_SMTP_PORT)}`;
 
@@ -198,13 +184,11 @@ export class MessageService {
       transport.close();
     }
 
-    // Bound only now: until the MTA accepted it, there was no Message-ID to bind them to.
     await this.attachments.attachTo(
       attached.map((row) => row.id),
       messageId,
     );
 
-    // Neither is done by the mail plane: Postfix files no copy, and the assumed milter does not exist.
     await this.fileInSent(mailbox, raw);
     await this.discardDraft(mailbox, mailboxId, input.replacesDraftId);
     await this.repository.recordSent(
@@ -262,7 +246,6 @@ export class MessageService {
     const raw = await this.compose(mailbox, messageId, input, attached);
     const drafts = (await this.specialFolder(mailbox, '\\Drafts')) ?? 'Drafts';
 
-    // \Draft marks it as unfinished so a mail client offers to edit rather than to read.
     await this.imap.append(address(mailbox), drafts, raw, ['\\Draft', '\\Seen']);
     await this.discardDraft(mailbox, mailboxId, input.replacesDraftId);
     await this.attachments.attachTo(
@@ -273,7 +256,6 @@ export class MessageService {
     this.logger.log({ event: 'message.draft_saved', mailboxId, messageId });
   }
 
-  // Best effort: whatever the draft produced is already out, so a stuck one must not fail the call.
   private async discardDraft(
     mailbox: OwnedMailbox,
     mailboxId: string,
@@ -297,7 +279,6 @@ export class MessageService {
     }
   }
 
-  // Resolved like a body, so it works for a delivered message and one that only exists in IMAP.
   async readAttachment(
     accountId: string,
     mailboxId: string,
@@ -335,8 +316,6 @@ export class MessageService {
     return { folder: row.folder, uid };
   }
 
-  // The whole conversation, oldest first, bodies included: one request where the panel used to
-  // fire a read and a thread call on every click.
   async thread(accountId: string, mailboxId: string, id: string): Promise<MessageDetail[]> {
     const mailbox = await this.requireMailbox(accountId, mailboxId);
     const row = await this.requireMessage(mailboxId, id);
@@ -352,7 +331,6 @@ export class MessageService {
       await this.markRead(accountId, mailboxId, id, true);
     }
 
-    // The newest are what a reader opens for; older ones stay listed, just without a body.
     const withBody = new Set(rows.slice(-THREAD_BODY_LIMIT).map((entry) => entry.id));
     const bodies = await this.fetchThreadBodies(
       mailbox,
@@ -367,7 +345,6 @@ export class MessageService {
     );
   }
 
-  // One connection per folder, not per message: a three-message thread is usually two.
   private async fetchThreadBodies(
     mailbox: OwnedMailbox,
     rows: readonly ReceivedMessage[],
@@ -402,7 +379,6 @@ export class MessageService {
           }
         }
       } catch (error) {
-        // One unreadable folder must not cost the reader the rest of the conversation.
         this.logger.warn({
           event: 'message.thread_body_skipped',
           mailboxId: mailbox.id,
@@ -425,7 +401,6 @@ export class MessageService {
     try {
       rows = await this.imap.listMessages(address(mailbox), folder);
     } catch (error) {
-      // A mirror that cannot read the source must not prune: an IMAP hiccup would empty the folder.
       this.logger.warn({
         event: 'message.sync_skipped',
         mailboxId,
@@ -436,7 +411,6 @@ export class MessageService {
       return;
     }
 
-    // A message with no Message-ID cannot be keyed, and every client writes one.
     const usable = dedupe(rows.filter((row) => row.messageId !== ''));
 
     if (usable.length !== rows.length) {
@@ -448,8 +422,6 @@ export class MessageService {
       });
     }
 
-    // Stamping every mirrored row as its own root flattened conversations. The root is the
-    // parent's thread when known, else the parent's Message-ID, which is what it will take too.
     const parents = await this.repository.threadsOf(
       mailboxId,
       usable.map((row) => row.inReplyTo).filter((value): value is string => value !== null),
@@ -482,7 +454,6 @@ export class MessageService {
     return folders.find((row) => row.specialUse === use)?.path ?? null;
   }
 
-  // Usually arrives without a UID, so it is looked up once by Message-ID and kept.
   private async resolveUid(mailbox: OwnedMailbox, row: ReceivedMessage): Promise<number | null> {
     if (row.imapUid !== null) {
       return row.imapUid;
@@ -497,7 +468,6 @@ export class MessageService {
     return found;
   }
 
-  // The message did leave, so failing to file the copy must not fail the send.
   private async fileInSent(mailbox: OwnedMailbox, raw: Buffer): Promise<void> {
     try {
       const folders = await this.imap.listFolders(address(mailbox));
@@ -553,8 +523,6 @@ function toSummary(row: ReceivedMessage): MessageSummary {
   };
 }
 
-// Self-addressed mail is one Message-ID in both INBOX and Sent, and the conversation listed
-// both. The copy in the folder being read is the one that survives.
 function dedupeThread(
   rows: readonly ReceivedMessage[],
   opened: ReceivedMessage,
@@ -580,9 +548,6 @@ function rank(row: ReceivedMessage, opened: ReceivedMessage): number {
   return row.folder === opened.folder ? 1 : 0;
 }
 
-// The projection keys on Message-ID within a folder; IMAP does not, so Trash can hold two
-// copies of one id. Postgres refuses the same key twice in an upsert and took the listing
-// down with a 500, so the newest copy wins.
 function dedupe(rows: readonly ImapMessage[]): ImapMessage[] {
   const byId = new Map<string, ImapMessage>();
 
@@ -600,7 +565,6 @@ function dedupe(rows: readonly ImapMessage[]): ImapMessage[] {
 function toDetail(row: ReceivedMessage, body: ParsedBody | null): MessageDetail {
   return {
     ...toSummary(row),
-    // The projection keeps the sender, never the recipients, so reopening a draft reads the body.
     to: body?.to ?? [],
     cc: body?.cc ?? [],
     html: body?.html == null ? null : sanitizeMessageHtml(body.html),

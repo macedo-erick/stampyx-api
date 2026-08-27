@@ -61,7 +61,6 @@ it('creates a rule and regenerates the Sieve script', async () => {
   const { sub } = await harness.newAccount();
   const mailboxId = await newMailbox(sub, 'rules-one.com');
 
-  // Creating the mailbox lays down the first script; this measures the rule's own effect.
   write.mockClear();
 
   const created = await call<RuleResponse>(
@@ -219,7 +218,6 @@ it('does not regenerate the script when the rule was not found', async () => {
   const { sub } = await harness.newAccount();
   const mailboxId = await newMailbox(sub, 'rules-seven.com');
 
-  // Creating the mailbox lays down the first script; this measures the rule's own effect.
   write.mockClear();
 
   const result = await call(

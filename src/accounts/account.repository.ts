@@ -20,8 +20,6 @@ export class AccountRepository {
     return row ?? null;
   }
 
-  // The SPI is at-least-once, so a redelivery must be a no-op rather than a 500 that
-  // would make it retry again.
   async provision(input: {
     id: string;
     keycloakSub: string;

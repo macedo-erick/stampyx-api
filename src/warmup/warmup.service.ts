@@ -40,7 +40,6 @@ export class WarmupService {
     };
   }
 
-  // One statement: checking then incrementing would let concurrent sends both pass the check.
   async consumeAllowance(accountId: string): Promise<number> {
     const cap = dailyCapFor(await this.daysSinceFirstVerified(accountId));
 

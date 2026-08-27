@@ -45,13 +45,11 @@ export class MailController {
   ): Promise<{ status: string }> {
     const target = await this.resolveMailbox(body.mailbox);
 
-    // A reply inherits its parent's conversation; the root on the row makes grouping one predicate.
     const threadId =
       body.inReplyTo === null
         ? body.messageId
         : ((await this.threadOf(target, body.inReplyTo)) ?? body.inReplyTo);
 
-    // Sieve runs before delivery is confirmed, so a retried delivery replays this call.
     const inserted = await this.db
       .insert(receivedMessage)
       .values({
@@ -100,7 +98,6 @@ export class MailController {
   ): Promise<{ status: string }> {
     const target = await this.resolveMailbox(body.mailbox);
 
-    // The milter reports again as the status settles, so this upserts on the natural key.
     await this.db
       .insert(sentMessage)
       .values({

@@ -38,7 +38,6 @@ export class MailGateway implements OnGatewayConnection {
     private readonly resolver: PrincipalResolver,
   ) {}
 
-  // Guards do not run on socket events, so the handshake is the only place to identify the caller.
   async handleConnection(client: Socket): Promise<void> {
     const token = tokenOf(client);
 
@@ -58,7 +57,6 @@ export class MailGateway implements OnGatewayConnection {
     }
   }
 
-  // The same ownership rules the HTTP routes use; without it any socket reads every subject line.
   @SubscribeMessage('inbox:join')
   async join(client: Socket, mailboxId: unknown): Promise<void> {
     const principal = principalOf(client);

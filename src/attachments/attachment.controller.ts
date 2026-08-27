@@ -18,7 +18,6 @@ import { CurrentAccount, PrincipalGuard } from '../auth/principal.guard';
 import { AttachmentService } from './attachment.service';
 import type { AttachmentResponse, UploadedFile } from './dto';
 
-// A draft on the mailbox until the send binds it to a Message-ID.
 @Controller('mailboxes/:mailboxId/attachments')
 @UseGuards(JwtGuard, PrincipalGuard, MailboxScopeGuard)
 export class AttachmentController {

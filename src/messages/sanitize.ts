@@ -3,7 +3,6 @@ import { JSDOM } from 'jsdom';
 
 const purify = createDOMPurify(new JSDOM('').window);
 
-// Remote images are the tracking-pixel vector: src is dropped into data-stampyx-src for the panel.
 purify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'IMG' && node.hasAttribute('src')) {
     const src = node.getAttribute('src') ?? '';

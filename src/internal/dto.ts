@@ -12,7 +12,6 @@ export const mailReceivedSchema = z.object({
   folder: z.string().trim().min(1).max(255).default('INBOX'),
   imapUid: z.coerce.number().int().positive().nullable().default(null),
   spamScore: z.coerce.number().int().nullable().default(null),
-  // Empty for a message that starts a conversation; the parent's Message-ID otherwise.
   inReplyTo: z
     .string()
     .trim()

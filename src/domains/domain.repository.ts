@@ -16,7 +16,6 @@ export class DomainRepository {
       .orderBy(domain.name);
   }
 
-  // Owner is in the predicate, so someone else's row is indistinguishable from no row.
   async findOwned(accountId: string, id: string): Promise<Domain | null> {
     const [row] = await this.db
       .select()

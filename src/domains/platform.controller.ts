@@ -5,7 +5,6 @@ import { PrincipalGuard } from '../auth/principal.guard';
 import type { PlatformDomainResponse } from './dto';
 import { PlatformDomainService } from './platform.service';
 
-// Not under /domains: that collection is the caller's own, and these belong to nobody.
 @Controller('platform-domains')
 @UseGuards(JwtGuard, PrincipalGuard)
 export class PlatformDomainController {

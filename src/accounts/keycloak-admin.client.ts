@@ -14,10 +14,8 @@ interface CachedToken {
   readonly expiresAt: number;
 }
 
-// Valid when we check should still be valid when it arrives.
 const EXPIRY_MARGIN_MS = 30_000;
 
-// Plain fetch: keycloak-admin-client is a large tree for two calls and pins its own version.
 @Injectable()
 export class KeycloakAdminClient {
   private token: CachedToken | null = null;

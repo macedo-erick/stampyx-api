@@ -69,7 +69,6 @@ it('refuses the admin surface to a mailbox session', async () => {
     ...AS_ADMIN,
   });
 
-  // The admin role is a Keycloak claim, so a mailbox token can never carry it.
   expect(refused.status).toBe(403);
 });
 
@@ -111,7 +110,6 @@ it('suspends an account and the mailbox leaves the mail plane with it', async ()
 
   expect(changed.status).toBe(200);
   expect(changed.body.status).toBe('suspended');
-  // Moving the account link onto mailbox.account_id must not have loosened this.
   await expect(dovecotRows(box.address)).resolves.toHaveLength(0);
 });
 

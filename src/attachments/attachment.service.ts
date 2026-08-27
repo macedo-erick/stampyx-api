@@ -53,7 +53,6 @@ export class AttachmentService {
     }
 
     const id = randomUUID();
-    // The id is the filename on disk: the name the sender typed never touches a path.
     const directory = path.join(this.config.MAIL_ATTACHMENTS_DIR, mailboxId);
     const storagePath = path.join(directory, id);
 
@@ -95,7 +94,6 @@ export class AttachmentService {
     this.logger.log({ event: 'attachment.deleted', mailboxId, attachmentId: id });
   }
 
-  // The send path: refuses anything not this mailbox's, or already on a sent message.
   async claim(mailboxId: string, ids: readonly string[]): Promise<Attachment[]> {
     const rows = await this.repository.findDrafts(mailboxId, ids);
 
@@ -145,7 +143,6 @@ function toResponse(row: Attachment): AttachmentResponse {
   };
 }
 
-// Display only, but it still ends up in a MIME header, so newlines and separators go.
 function safeName(name: string): string {
   return (
     path

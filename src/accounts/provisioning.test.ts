@@ -54,7 +54,6 @@ it('provisions a pending account from a correctly signed registration event', as
 
   expect(row?.email).toBe(`${userId}@example.test`);
   expect(row?.name).toBe('Ada Lovelace');
-  // Registration alone must not grant standing.
   expect(row?.status).toBe('pending');
   expect(row?.approvedAt).toBeNull();
 });

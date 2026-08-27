@@ -68,7 +68,6 @@ export class RuleRepository {
     return deleted.length > 0;
   }
 
-  // Two passes in one transaction: shifting one at a time collides with the rows not yet moved.
   async reorder(mailboxId: string, ruleIds: readonly string[]): Promise<FolderRule[]> {
     return this.db.transaction(async (tx) => {
       await tx
