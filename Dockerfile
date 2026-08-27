@@ -30,6 +30,9 @@ COPY --chown=app:app package.json yarn.lock .yarnrc.yml ./
 RUN yarn workspaces focus --production && yarn cache clean --all
 COPY --chown=app:app --from=build /app/dist ./dist
 COPY --chown=app:app drizzle ./drizzle
+# MAIL_ATTACHMENTS_DIR is a named volume. Docker creates a missing mountpoint as root, which
+# the app user cannot write; owning it here is what makes Docker seed the volume as app.
+RUN install -d -o app -g app /data/attachments
 USER app
 EXPOSE 8080
 ENV NODE_OPTIONS="--max-old-space-size=384"
