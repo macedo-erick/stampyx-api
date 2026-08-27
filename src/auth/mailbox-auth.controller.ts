@@ -23,9 +23,8 @@ import { MailboxAuthService } from './mailbox-auth.service';
 import type { Principal } from './principal';
 import { CurrentPrincipal, PrincipalGuard } from './principal.guard';
 
-// Mailbox users are provisioned by an administrator, never self-registered, so they have no
-// Keycloak identity to log in with. Their password is the one Dovecot checks, which is what
-// makes a change here take effect on IMAP and SMTP in the same write.
+// Provisioned, never self-registered, so there is no Keycloak identity. The password is the
+// one Dovecot checks, so a change here reaches IMAP and SMTP in the same write.
 @Controller('auth/mailbox')
 export class MailboxAuthController {
   constructor(private readonly service: MailboxAuthService) {}
@@ -57,8 +56,7 @@ export class MailboxAuthController {
     @CurrentPrincipal() principal: Principal,
     @Body(zodBody(changePasswordSchema)) body: ChangePasswordRequest,
   ): Promise<void> {
-    // An account owner resets a mailbox they own through PUT /mailboxes/:id/password, which
-    // needs no current password because they administer it.
+    // An owner resets through PUT /mailboxes/:id/password, which needs no current password.
     if (principal.kind !== 'mailbox') {
       throw new ForbiddenException('This endpoint is for mailbox sessions');
     }

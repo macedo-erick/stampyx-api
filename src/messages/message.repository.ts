@@ -47,9 +47,8 @@ export class MessageRepository {
   async delete(id: string): Promise<void> {
     await this.db.delete(receivedMessage).where(eq(receivedMessage.id, id));
   }
-  // The schema expects a Postfix milter to write these, but no such milter exists in the
-  // stack, so the send path records what it handed to the MTA. Status stays `pending`:
-  // acceptance by Postfix is not delivery.
+  // The schema expects a milter that this stack does not have, so the send path records what it
+  // handed over. Status stays `pending`: acceptance by Postfix is not delivery.
   async setImapUid(id: string, imapUid: number): Promise<void> {
     await this.db.update(receivedMessage).set({ imapUid }).where(eq(receivedMessage.id, id));
   }
@@ -74,9 +73,8 @@ export class MessageRepository {
         target: [sentMessage.mailboxId, sentMessage.messageId, sentMessage.recipient],
       });
   }
-  // Sent and Drafts are appended, never delivered, so nothing reports them. Listing one
-  // mirrors the folder into the projection first, which is what gives those messages a
-  // real row - and therefore a UUID the panel can address like any other.
+  // Sent and Drafts are appended, so nothing reports them: listing mirrors the folder first,
+  // which is what gives those messages a row and a UUID the panel can address.
   async syncFolder(
     mailboxId: string,
     folder: string,
@@ -95,15 +93,13 @@ export class MessageRepository {
             recipient: sql`excluded.recipient`,
             subject: sql`excluded.subject`,
             inReplyTo: sql`excluded.in_reply_to`,
-            // Self-healing: rows mirrored before the root was derived carry themselves as
-            // their own thread, and re-listing the folder puts them back in the conversation.
+            // Self-healing: rows mirrored before the root existed carry themselves, and re-listing fixes them.
             threadId: sql`excluded.thread_id`,
           },
         });
     }
 
-    // A draft replaced by a newer save, or a message removed from another client, leaves a
-    // row behind that would show as a message that no longer exists.
+    // A superseded draft, or one removed elsewhere, leaves a row showing a message that is gone.
     const keep = rows.map((row) => row.messageId);
 
     await this.db
@@ -117,8 +113,7 @@ export class MessageRepository {
       );
   }
 
-  // The threads a batch of parents belong to, so mirrored replies inherit the same root
-  // without one query per message.
+  // The threads a batch of parents belong to, so replies inherit the root without a query each.
   async threadsOf(mailboxId: string, messageIds: readonly string[]): Promise<Map<string, string>> {
     if (messageIds.length === 0) {
       return new Map();

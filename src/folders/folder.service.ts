@@ -28,8 +28,7 @@ export class FolderService {
   async list(accountId: string, mailboxId: string): Promise<FolderResponse[]> {
     const address = await this.address(accountId, mailboxId);
 
-    // From IMAP, not from the message rows: a folder with nothing in it is still a folder,
-    // and an empty one used to be invisible to the panel.
+    // From IMAP, not the message rows: an empty folder is still a folder, and used to be invisible.
     const folders = await this.imap.listFolders(address);
     const counts = new Map(
       (await this.repository.counts(mailboxId)).map((row) => [row.folder, row] as const),
@@ -38,9 +37,8 @@ export class FolderService {
       (await this.repository.ruleTargets(mailboxId)).map((row) => [row.folder, row.total] as const),
     );
 
-    // The server's own count, for every folder at once. The projection only knows a folder
-    // that has been listed at least once, which is why a badge used to sit still until you
-    // opened the folder it was counting.
+    // The server's count for every folder at once. The projection knows only folders already
+    // listed, which is why a badge sat still until you opened the folder it counted.
     const live = await this.liveCounts(address, folders);
 
     return folders
@@ -63,8 +61,7 @@ export class FolderService {
       .sort((a, b) => a.path.localeCompare(b.path));
   }
 
-  // Best effort: a folder list that loses its badges is a nuisance, a folder list that
-  // fails to load is a broken panel. The projection's counts stand in.
+  // Best effort: losing badges is a nuisance, failing to load is a broken panel. The projection stands in.
   private async liveCounts(
     address: string,
     folders: readonly ImapFolder[],
@@ -98,8 +95,7 @@ export class FolderService {
       throw new NotFoundException('No such parent folder');
     }
 
-    // Built with the separator the server reported, not an assumed one: get this wrong and
-    // the folder is created with a literal slash in its name instead of nested.
+    // The separator the server reported: assume it and the folder gets a literal slash in its name.
     const path =
       input.parent === undefined ? input.name : `${input.parent}${delimiter}${input.name}`;
 
@@ -145,8 +141,7 @@ export class FolderService {
 
     this.requireNotSystem(found);
 
-    // Deleting it out from under a rule would leave a Sieve script filing into a folder
-    // that no longer exists, and the message would land back in INBOX with no explanation.
+    // A Sieve script filing into a folder that is gone drops the message back in INBOX unexplained.
     const used = (await this.repository.ruleTargets(mailboxId)).find((row) => row.folder === path);
 
     if (used !== undefined) {
@@ -201,8 +196,7 @@ export class FolderService {
   }
 }
 
-// A folder the server flagged with SPECIAL-USE, plus INBOX itself. Matching on the name
-// instead would call a user's own folder named "Archive" a system one.
+// SPECIAL-USE plus INBOX: matching on the name would call a user's own "Archive" a system folder.
 function isSystem(folder: ImapFolder): boolean {
   return folder.path.toUpperCase() === 'INBOX' || folder.specialUse !== null;
 }

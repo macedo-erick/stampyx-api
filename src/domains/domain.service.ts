@@ -61,8 +61,7 @@ export class DomainService {
     return runDnsCheck(this.dns, this.checkInput(row));
   }
 
-  // Separate from dns-check: other records can be fixed later, but until the challenge TXT
-  // is present the SQL views keep this domain out of Postfix and Dovecot entirely.
+  // Separate from dns-check: until the challenge TXT lands, the views keep this domain out entirely.
   async verify(accountId: string, id: string): Promise<DomainResponse> {
     const row = await this.requireOwned(accountId, id);
 

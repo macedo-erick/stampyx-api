@@ -60,9 +60,8 @@ export class MailboxService {
       quotaMb: input.quotaMb,
     });
 
-    // The Sieve script is what installs the notify pipe, and the pipe is the only thing
-    // that records an incoming message. Until now it was written only when a rule changed,
-    // so a mailbox that never had a rule never reported a single delivery.
+    // The script installs the notify pipe, the only thing that records an incoming message.
+    // Written only on a rule change before, so a mailbox without rules reported nothing.
     await this.installSieve(owned.name, input.localPart);
 
     this.logger.log({ event: 'mailbox.created', mailboxId: created.id, accountId });
@@ -96,8 +95,7 @@ export class MailboxService {
     return !(await this.repository.existsAt(domainId, localPart));
   }
 
-  // The consumer path. The domain belongs to nobody, so ownership cannot be checked against
-  // it - the new mailbox carries the account itself.
+  // The consumer path: the domain belongs to nobody, so the new mailbox carries the account.
   async createOnPlatform(
     accountId: string,
     domainId: string,
@@ -131,8 +129,7 @@ export class MailboxService {
       id: randomUUID(),
       domainId,
       accountId,
-      // No mail password yet: the panel signs in through Keycloak, and IMAP stays shut until
-      // the owner sets one for an external client.
+      // No mail password yet: the panel is Keycloak, and IMAP stays shut until the owner sets one.
       passwordHash: await unusableMailboxPassword(),
       localPart,
     });
@@ -170,8 +167,7 @@ export class MailboxService {
     try {
       await this.sieve.write({ domainName, localPart }, []);
     } catch (error) {
-      // A mailbox that exists without a script still receives mail; it just will not report
-      // deliveries until the next rule change rewrites it.
+      // It still receives mail, but reports no delivery until the next rule change rewrites the script.
       this.logger.warn({
         event: 'mailbox.sieve_failed',
         localPart,

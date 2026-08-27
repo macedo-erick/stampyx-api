@@ -5,8 +5,7 @@ import { PrincipalGuard } from '../auth/principal.guard';
 import type { PlatformDomainResponse } from './dto';
 import { PlatformDomainService } from './platform.service';
 
-// The domains the platform itself owns. Not under /domains: that collection is the caller's
-// own domains, and these belong to nobody.
+// Not under /domains: that collection is the caller's own, and these belong to nobody.
 @Controller('platform-domains')
 @UseGuards(JwtGuard, PrincipalGuard)
 export class PlatformDomainController {

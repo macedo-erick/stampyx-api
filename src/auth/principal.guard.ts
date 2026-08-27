@@ -10,7 +10,6 @@ import type { Request } from 'express';
 import type { Principal } from './principal';
 import { PrincipalResolver } from './principal.resolver';
 
-// Runs after JwtGuard: @UseGuards(JwtGuard, PrincipalGuard)
 @Injectable()
 export class PrincipalGuard implements CanActivate {
   constructor(private readonly resolver: PrincipalResolver) {}
@@ -42,8 +41,7 @@ export const CurrentPrincipal = createParamDecorator(
   },
 );
 
-// Kept so every existing controller keeps its signature: ownership is still an accountId,
-// whichever kind of principal supplied it.
+// Ownership is still an accountId whichever principal supplied it, so signatures are unchanged.
 export const CurrentAccount = createParamDecorator((_data: unknown, context: ExecutionContext) => {
   const request = context.switchToHttp().getRequest<Request>();
   const accountId = request.principal?.accountId;

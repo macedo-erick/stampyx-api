@@ -45,9 +45,8 @@ beforeAll(async () => {
     move: vi.spyOn(client, 'move').mockResolvedValue(undefined),
     remove: vi.spyOn(client, 'remove').mockResolvedValue(undefined),
     append: vi.spyOn(client, 'append').mockResolvedValue(undefined),
-    // Every listing reconciles against the server first. These tests seed the projection
-    // directly, so the default is an unreadable source - the case where the mirror must
-    // serve what it already knows rather than prune it. Mirror tests override this.
+    // Every listing reconciles against the server, but these tests seed the projection directly,
+    // so the default is an unreadable source: the mirror serves what it knows. Mirror tests override.
     listMessages: vi
       .spyOn(client, 'listMessages')
       .mockRejectedValue(new Error('imap unavailable in tests')),

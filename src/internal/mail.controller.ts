@@ -45,8 +45,7 @@ export class MailController {
   ): Promise<{ status: string }> {
     const target = await this.resolveMailbox(body.mailbox);
 
-    // A reply inherits its parent's conversation; anything else starts one of its own. The
-    // root is kept on the row so grouping is one predicate rather than a header walk.
+    // A reply inherits its parent's conversation; the root on the row makes grouping one predicate.
     const threadId =
       body.inReplyTo === null
         ? body.messageId
@@ -101,8 +100,7 @@ export class MailController {
   ): Promise<{ status: string }> {
     const target = await this.resolveMailbox(body.mailbox);
 
-    // The milter reports the same message again as its status moves pending to delivered
-    // or bounced, so this upserts on the natural key rather than inserting twice.
+    // The milter reports again as the status settles, so this upserts on the natural key.
     await this.db
       .insert(sentMessage)
       .values({

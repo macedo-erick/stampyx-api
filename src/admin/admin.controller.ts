@@ -27,8 +27,7 @@ import {
   setStatusSchema,
 } from './dto';
 
-// Management only. There is deliberately no endpoint here that reads anyone's mail: the
-// master IMAP user would make it trivial, which is exactly why it is not exposed.
+// Management only. No endpoint reads anyone's mail: the master IMAP user would make it trivial.
 @Controller('admin')
 @UseGuards(JwtGuard, PrincipalGuard, AdminGuard)
 export class AdminController {
@@ -84,8 +83,7 @@ export class AdminController {
     return this.service.deleteMailbox(id);
   }
 
-  // Where the DKIM value to publish comes from: the key pair only exists once the seed has
-  // run on a deployed instance.
+  // The key pair only exists once the seed has run on a deployed instance.
   @Get('platform-domains/:id/dns')
   platformDns(@Param('id', ParseUUIDPipe) id: string): Promise<DnsRecordResponse[]> {
     return this.platform.dnsRecords(id);

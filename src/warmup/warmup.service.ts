@@ -40,8 +40,7 @@ export class WarmupService {
     };
   }
 
-  // Increments only if the result would stay within the cap, in one statement. Checking and
-  // then incrementing would let concurrent sends both pass the check.
+  // One statement: checking then incrementing would let concurrent sends both pass the check.
   async consumeAllowance(accountId: string): Promise<number> {
     const cap = dailyCapFor(await this.daysSinceFirstVerified(accountId));
 

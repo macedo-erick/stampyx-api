@@ -12,10 +12,8 @@ import { MailboxTokenService } from './mailbox-token.service';
 import { PrincipalGuard } from './principal.guard';
 import { PrincipalResolver } from './principal.resolver';
 
-// Global, and it re-exports what the guards inject: an enhancer named in @UseGuards is
-// constructed in the host controller's module, so AccountService and MailboxRepository have
-// to be resolvable from every one of them. Importing AuthModule in each would close a cycle
-// back through MailboxesModule.
+// Global, and re-exports what the guards inject: an enhancer is constructed in its host
+// controller's module, and importing AuthModule in each would cycle through MailboxesModule.
 @Global()
 @Module({
   imports: [AccountsModule, MailboxesModule],

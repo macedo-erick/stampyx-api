@@ -4,10 +4,9 @@ import { MailboxRepository } from '../mailboxes/mailbox.repository';
 import { RuleRepository } from './rule.repository';
 import { SieveWriter } from './sieve.writer';
 
-// The Sieve script carries the notify pipe, and the pipe is the only thing that records an
-// incoming message. Writing it on mailbox creation covers new mailboxes; this covers the
-// ones that already existed, and rewrites any script the current generator would produce
-// differently - otherwise a fix to the generator never reaches a mailbox that has a file.
+// The script carries the notify pipe, the only record of an incoming message. Creation covers
+// new mailboxes; this covers the existing ones, and rewrites whatever the generator now
+// produces differently, or a fix never reaches a mailbox that already has a file.
 @Injectable()
 export class SieveReconciler implements OnModuleInit {
   private readonly logger = new Logger(SieveReconciler.name);

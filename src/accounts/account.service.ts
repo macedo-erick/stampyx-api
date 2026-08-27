@@ -38,9 +38,8 @@ export class AccountService {
     return found;
   }
 
-  // The registration webhook is at-least-once, which also means it can be zero times if the
-  // API was down while Keycloak exhausted its retries. Without this the user is locked out
-  // permanently and only a manual INSERT recovers them.
+  // At-least-once also means zero times, if the API was down while Keycloak exhausted its
+  // retries. Without this the user is locked out permanently, recoverable only by hand.
   private async selfProvision(user: KeycloakIdentity): Promise<Account> {
     if (user.email === null) {
       throw new UnauthorizedException('No account is provisioned for this identity');

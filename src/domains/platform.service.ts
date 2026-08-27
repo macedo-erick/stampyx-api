@@ -9,8 +9,7 @@ import { dnsRecordsFor } from './dns-records';
 import { DomainRepository } from './domain.repository';
 import type { DnsRecordResponse, PlatformDomainResponse } from './dto';
 
-// Never read: a platform domain is seeded verified, so it has no challenge to publish. The
-// column is NOT NULL because every customer domain needs one.
+// Never read: seeded verified, so no challenge. NOT NULL only because customer domains need one.
 const UNUSED_TOKEN = 'stampyx-platform-domain';
 
 @Injectable()
@@ -31,8 +30,7 @@ export class PlatformDomainService implements OnModuleInit {
       const existing = await this.repository.findByName(name);
 
       if (existing !== null) {
-        // Converting it would hand us a domain a customer already proved they control, and
-        // silently move every mailbox on it onto the platform's DNS.
+        // It would hand us a domain a customer proved they control, and move its mailboxes onto our DNS.
         if (existing.kind !== 'platform') {
           throw new Error(
             `${name} is listed in STAMPYX_PLATFORM_DOMAINS but is already registered as a customer domain. Remove it from the list or delete the customer domain first.`,
@@ -77,8 +75,7 @@ export class PlatformDomainService implements OnModuleInit {
     return row;
   }
 
-  // The DKIM value only exists once the seed has generated the key pair, so this is where
-  // the records to publish come from after the first deploy.
+  // The key pair exists only once the seed has run, so the records to publish come from here.
   async dnsRecords(id: string): Promise<DnsRecordResponse[]> {
     return dnsRecordsFor(await this.require(id), this.config);
   }

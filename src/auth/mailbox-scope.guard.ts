@@ -7,9 +7,9 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 
-// The second narrowing behind PrincipalGuard. A mailbox user resolves to the account that
-// owns their domain, so account-scoped SQL alone would hand them every sibling mailbox on it.
-// 404 rather than 403, so a probe cannot tell an existing mailbox from an absent one.
+// The second narrowing behind PrincipalGuard: a mailbox user resolves to the account owning
+// their domain, so account-scoped SQL alone hands them every sibling. 404, not 403, so a
+// probe cannot tell an existing mailbox from an absent one.
 @Injectable()
 export class MailboxScopeGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {

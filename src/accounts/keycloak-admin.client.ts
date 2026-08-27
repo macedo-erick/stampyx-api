@@ -17,8 +17,7 @@ interface CachedToken {
 // Valid when we check should still be valid when it arrives.
 const EXPIRY_MARGIN_MS = 30_000;
 
-// Plain fetch rather than keycloak-admin-client, which brings a large tree for two calls
-// and pins its own Keycloak version. Nothing here checks who is asking.
+// Plain fetch: keycloak-admin-client is a large tree for two calls and pins its own version.
 @Injectable()
 export class KeycloakAdminClient {
   private token: CachedToken | null = null;

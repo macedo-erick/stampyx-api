@@ -18,8 +18,7 @@ import { CurrentAccount, PrincipalGuard } from '../auth/principal.guard';
 import { AttachmentService } from './attachment.service';
 import type { AttachmentResponse, UploadedFile } from './dto';
 
-// Uploaded before the message exists, so an attachment starts as a draft belonging to the
-// mailbox and is bound to a Message-ID only when the send actually goes out.
+// A draft on the mailbox until the send binds it to a Message-ID.
 @Controller('mailboxes/:mailboxId/attachments')
 @UseGuards(JwtGuard, PrincipalGuard, MailboxScopeGuard)
 export class AttachmentController {

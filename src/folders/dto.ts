@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
-// IMAP hierarchy separator. Names are validated without it and joined here, so a caller
-// cannot smuggle in a path and create a folder somewhere else in the tree.
+// Validated without the separator and joined here, so no caller can smuggle in a path.
 export const FOLDER_SEPARATOR = '/';
 
 const folderName = z

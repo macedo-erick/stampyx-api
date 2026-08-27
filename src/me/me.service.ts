@@ -66,10 +66,9 @@ export class MeService {
     let mailboxes = await this.mailboxes.listForAccount(principal.accountId);
     let platformAddress = mailboxes.find((row) => row.platform) ?? null;
 
-    // Signing up already named an address; making the new arrival fill in a form to confirm
-    // what they just typed is ceremony. Claimed here, on the panel's first call, because
-    // account creation happens in a module that cannot reach mailboxes without a cycle.
-    // Idempotent, and it falls through to the onboarding screen when the name is taken.
+    // Signing up already named an address, so confirming it in a form is ceremony. Claimed on the
+    // panel's first call because account creation cannot reach mailboxes without a cycle.
+    // Idempotent, and falls through to onboarding when the name is taken.
     if (platformAddress === null && offered.length > 0) {
       const claimed = await this.autoClaim(principal.accountId, account.email, offered);
 
