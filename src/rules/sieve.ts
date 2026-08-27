@@ -9,8 +9,7 @@ function quote(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-// :matches also treats * and ? as wildcards. Escaping happens in one pass and the intended
-// wildcard is appended outside it, or escaping the value would escape the wildcard too.
+// :matches also treats * and ? as wildcards, so the intended one is appended outside the escape pass.
 function quoteMatch(value: string, { prefix = '', suffix = '' } = {}): string {
   return `"${prefix}${value.replace(/([\\"*?])/g, '\\$1')}${suffix}"`;
 }
@@ -51,9 +50,8 @@ function condition(rule: FolderRule): string | null {
   }
 }
 
-// Each branch that stops has to report for itself. The pipe used to sit only at the end,
-// after every rule's `stop`, so a message a rule filed away was never reported at all - it
-// left the inbox and never appeared in the folder either.
+// Each stopping branch reports for itself. With the pipe only at the end, past every `stop`,
+// a message a rule filed away was never reported and vanished from both inbox and folder.
 function body(rule: FolderRule, notify: string): string[] | null {
   switch (rule.action) {
     case 'move_to':
@@ -77,14 +75,12 @@ function body(rule: FolderRule, notify: string): string[] | null {
   }
 }
 
-// The folder rides as an argument because the pipe program runs with a cleared environment
-// and otherwise has no idea where the message was filed.
+// An argument, because the pipe runs with a cleared environment and cannot see where it was filed.
 function notifyCall(script: string, folder: string): string {
   return `pipe :copy ${quote(script)} [${quote(folder)}]`;
 }
 
-// Fixed order: spam, then user rules, then notification. Regenerated whole on every change,
-// so the script can never drift from the table it came from.
+// Fixed order: spam, user rules, notification. Regenerated whole, so it cannot drift from the table.
 export function generateSieve(rules: readonly FolderRule[], options: SieveOptions): string {
   const lines: string[] = [
     'require ["copy", "fileinto", "imap4flags", "vnd.dovecot.pipe"];',

@@ -13,8 +13,7 @@ export interface FetchedAttachment {
 export interface ParsedBody {
   readonly html: string | null;
   readonly text: string | null;
-  // Reopening a draft has to put the recipients back in the fields, and the projection does
-  // not keep them: the message itself is the only place they exist.
+  // The projection does not keep recipients; reopening a draft needs them from the message itself.
   readonly to: readonly string[];
   readonly cc: readonly string[];
   readonly attachments: readonly {
@@ -24,16 +23,14 @@ export interface ParsedBody {
   }[];
 }
 
-// What a folder holds right now, without reading a single message. STATUS is the cheap call
-// IMAP provides for exactly this, which is what lets a badge stay honest for a folder
-// nobody has opened.
+// What a folder holds right now without reading a message: STATUS is what keeps a badge
+// honest for a folder nobody has opened.
 export interface FolderStatus {
   readonly total: number;
   readonly unread: number;
 }
 
-// The server decides both of these. Hard-coding a separator is how a hierarchy silently
-// stops working when the namespace is configured differently.
+// The server decides both; a hard-coded separator breaks silently on another namespace.
 export interface ImapFolder {
   readonly path: string;
   readonly delimiter: string;
@@ -100,8 +97,7 @@ export class ImapClient implements ImapOperations {
     });
   }
 
-  // One connection for the whole conversation. Reading a thread message by message opened
-  // an IMAP session per message, which is the wrong shape for a pane that shows five.
+  // One connection for the conversation: message by message opened an IMAP session each.
   async fetchBodies(
     address: string,
     folder: string,
@@ -130,8 +126,7 @@ export class ImapClient implements ImapOperations {
     });
   }
 
-  // Counted by the server, not by the projection: a badge that only moved once its folder
-  // was opened was reporting the last sync rather than the mailbox.
+  // By the server, not the projection, which only knew the last sync of an opened folder.
   async statusOf(address: string, paths: readonly string[]): Promise<Map<string, FolderStatus>> {
     if (paths.length === 0) {
       return new Map();
@@ -146,8 +141,7 @@ export class ImapClient implements ImapOperations {
 
           counts.set(path, { total: status.messages ?? 0, unread: status.unseen ?? 0 });
         } catch {
-          // A folder that cannot be counted is not a reason to leave the rest uncounted:
-          // the caller falls back to what the projection knows for this one.
+          // One uncountable folder must not leave the rest uncounted; the projection stands in for it.
           continue;
         }
       }
@@ -156,8 +150,7 @@ export class ImapClient implements ImapOperations {
     });
   }
 
-  // The list only carries names and sizes; the bytes are read on demand, straight from the
-  // message source, so nothing is copied to disk to be served.
+  // The list carries names and sizes; the bytes are read from the source, never copied to disk.
   async fetchAttachment(
     address: string,
     folder: string,
@@ -186,8 +179,7 @@ export class ImapClient implements ImapOperations {
     });
   }
 
-  // Sent mail is appended, never delivered, so it never passes the notify pipe and cannot
-  // come from the received_message projection. For that folder IMAP is the only source.
+  // Sent mail is appended, never delivered, so it never passes the pipe: IMAP is the only source.
   async listMessages(address: string, folder: string): Promise<ImapMessage[]> {
     return this.withMailbox(address, folder, async (client) => {
       const rows: ImapMessage[] = [];
@@ -216,9 +208,8 @@ export class ImapClient implements ImapOperations {
     });
   }
 
-  // Sieve runs before the message has a UID, so the notify pipe cannot report one and every
-  // row arrives with imapUid null. The Message-ID is the only handle that exists at both
-  // ends, so it is what finds the message again.
+  // Sieve runs before the message has a UID, so every row arrives with imapUid null and the
+  // Message-ID is the only handle that exists at both ends.
   async findUid(address: string, folder: string, messageId: string): Promise<number | null> {
     return this.withMailbox(address, folder, async (client) => {
       const found = await client.search({ header: { 'message-id': messageId } }, { uid: true });
@@ -283,8 +274,7 @@ export class ImapClient implements ImapOperations {
     });
   }
 
-  // Postfix relays the message but never files a copy: putting it in Sent is the client's
-  // job, and nothing was doing it, so a sent message existed nowhere the panel could see.
+  // Postfix relays but files no copy: filing Sent is the client's job, and nothing was doing it.
   async append(address: string, folder: string, raw: Buffer, flags: string[]): Promise<void> {
     await this.connected(address, async (client) => {
       await client.append(folder, raw, flags);
@@ -309,8 +299,7 @@ export class ImapClient implements ImapOperations {
     });
   }
 
-  // Connections are per operation and closed straight after. A pool keyed by mailbox would
-  // hold an open IMAP session per panel user, which is the wrong shape for a request API.
+  // Per operation and closed after: a pool keyed by mailbox holds a session per panel user.
   private async connected<T>(
     address: string,
     action: (client: ImapFlow) => Promise<T>,
@@ -357,8 +346,7 @@ function toParsedBody(parsed: ParsedMail): ParsedBody {
   };
 }
 
-// mailparser hands back either one header or an array of them, depending on how the message
-// was written; both shapes carry the same list underneath.
+// mailparser hands back one header or an array of them; both carry the same list underneath.
 function addressesOf(field: ParsedMail['to']): string[] {
   const groups = field === undefined ? [] : Array.isArray(field) ? field : [field];
 

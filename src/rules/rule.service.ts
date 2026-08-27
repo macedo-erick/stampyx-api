@@ -68,8 +68,7 @@ export class RuleService {
     const mailbox = await this.requireMailbox(accountId, mailboxId);
     const existing = await this.repository.listFor(mailboxId);
 
-    // A partial list would silently leave the omitted rules at position 0, changing an order
-    // the caller never asked to change.
+    // A partial list leaves the omitted rules at position 0, reordering what nobody asked to reorder.
     if (
       ruleIds.length !== existing.length ||
       new Set(ruleIds).size !== ruleIds.length ||
@@ -97,8 +96,7 @@ export class RuleService {
     this.logger.log({ event: 'rule.deleted', ruleId: id, accountId });
   }
 
-  // Counted against what actually arrived, so someone writing a rule can see whether it
-  // catches anything before saving it.
+  // Counted against what actually arrived, so a rule can be seen to catch something before saving.
   async preview(
     accountId: string,
     mailboxId: string,

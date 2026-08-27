@@ -41,8 +41,7 @@ export class FolderRepository {
       .map((row) => ({ folder: row.folder, total: row.total }));
   }
 
-  // The folder and everything nested under it, which is what IMAP removes too. The
-  // separator is the server's, so it is passed in rather than assumed.
+  // The folder and everything under it, as IMAP does; the separator is the server's, so passed in.
   private subtree(mailboxId: string, path: string, delimiter: string) {
     return and(
       eq(receivedMessage.mailboxId, mailboxId),
@@ -59,15 +58,13 @@ export class FolderRepository {
     await this.db
       .update(receivedMessage)
       .set({
-        // Casts are explicit: Postgres cannot infer the type of a bare parameter on either
-        // side of ||, and the statement fails to plan without them.
+        // Explicit casts: Postgres cannot infer a bare parameter beside ||, and the statement fails to plan.
         folder: sql`${target}::text || substring(${receivedMessage.folder} from ${path.length + 1}::int)`,
       })
       .where(this.subtree(mailboxId, path, delimiter));
   }
 
-  // Dovecot has already destroyed the messages, so rows left behind would be phantoms in
-  // the list. They go with the folder.
+  // Dovecot already destroyed the messages, so any row left behind is a phantom in the list.
   async deleteSubtree(mailboxId: string, path: string, delimiter: string): Promise<void> {
     await this.db.delete(receivedMessage).where(this.subtree(mailboxId, path, delimiter));
   }

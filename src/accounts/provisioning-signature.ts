@@ -1,7 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-// Named for planelyx because that is the artifact that ships it; renaming would mean
-// hand-editing eventsListeners on every already-imported realm.
+// Named for planelyx, which ships it: renaming means hand-editing eventsListeners on every realm.
 export const PROVISIONING_SIGNATURE_HEADER = 'x-planelyx-signature';
 
 export function verifyProvisioningSignature(

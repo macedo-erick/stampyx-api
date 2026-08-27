@@ -110,8 +110,7 @@ it('leaves an upload unbound until the message actually goes out', async () => {
     .from(attachment)
     .where(eq(attachment.id, created.body.id));
 
-  // There is no Message-ID to bind it to yet, and sent_message does not exist until the
-  // milter reports the send.
+  // No Message-ID to bind to yet, and sent_message waits on the milter.
   expect(row?.messageId).toBeNull();
 
   const listed = await call<AttachmentResponse[]>(

@@ -42,8 +42,7 @@ export const rulePreviewSchema = z.object({
 export type RulePreviewRequest = z.infer<typeof rulePreviewSchema>;
 
 export interface RulePreviewResponse {
-  // False for `recipient`: received_message keeps the sender, not the envelope recipient,
-  // so the rule works at delivery but there is nothing stored to count it against.
+  // False for `recipient`: the projection keeps the sender, so there is nothing to count against.
   readonly supported: boolean;
   readonly total: number;
   readonly sample: readonly {

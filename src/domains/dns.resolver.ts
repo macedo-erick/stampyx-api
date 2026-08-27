@@ -8,8 +8,8 @@ export interface DnsLookups {
   reverse(ip: string): Promise<string[]>;
 }
 
-// Wrapped so a missing name is an empty list, not an exception, and so lookups bypass the
-// OS stub cache: a cached NXDOMAIN would tell a user their correct record is wrong.
+// A missing name is an empty list, not an exception, and lookups bypass the OS stub cache,
+// where a stale NXDOMAIN would call a correct record wrong.
 @Injectable()
 export class DnsResolver implements DnsLookups {
   private readonly resolver = new Resolver({ timeout: 5_000, tries: 2 });
