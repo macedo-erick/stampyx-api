@@ -44,8 +44,7 @@ export class MailboxAuthService {
       input.email.slice(at + 1),
     );
 
-    // Same answer whether the address is unknown or the password is wrong: anything else
-    // turns this into an address-enumeration oracle.
+    // Same answer for an unknown address and a wrong password, or this is an enumeration oracle.
     if (found === null) {
       throw new UnauthorizedException('Invalid address or password');
     }
@@ -118,8 +117,7 @@ export class MailboxAuthService {
     this.logger.log({ event: 'mailbox.password_changed', mailboxId: found.id });
   }
 
-  // The conditions v_dovecot_users applies. Refusing here keeps the panel from accepting a
-  // login the mail server would reject anyway.
+  // The conditions v_dovecot_users applies: the panel must not accept a login the mail server refuses.
   private requireUsable(found: MailboxStanding): void {
     if (!found.active) {
       throw new ForbiddenException('This mailbox is disabled');

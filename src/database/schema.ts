@@ -47,8 +47,7 @@ export const domain = pgTable(
   'domain',
   {
     id: uuid('id').primaryKey(),
-    // Null for a platform domain: nobody owns it, and each mailbox on it carries its own
-    // account_id instead. A custom domain must still name an owner - see the check below.
+    // Null for a platform domain, whose mailboxes carry their own account_id; a custom one must not be.
     accountId: uuid('account_id').references(() => account.id, { onDelete: 'cascade' }),
     kind: varchar('kind', { length: 16 }).notNull().default('custom'),
     name: varchar('name', { length: 253 }).notNull(),
@@ -63,8 +62,7 @@ export const domain = pgTable(
     uniqueIndex('uq_domain_name').on(table.name),
     index('idx_domain_account_id').on(table.accountId, table.name),
     check('domain_kind_check', sql`${table.kind} IN ('platform', 'custom')`),
-    // An unowned custom domain would be invisible to every account-scoped query and
-    // unreachable from the panel, so it could never be fixed or deleted.
+    // Unowned, it would be invisible to every account-scoped query and impossible to fix or delete.
     check(
       'domain_account_check',
       sql`${table.kind} = 'platform' OR ${table.accountId} IS NOT NULL`,
@@ -79,8 +77,7 @@ export const mailbox = pgTable(
     domainId: uuid('domain_id')
       .notNull()
       .references(() => domain.id, { onDelete: 'cascade' }),
-    // Ownership used to travel through domain.account_id. It cannot any more: a mailbox on
-    // a platform domain belongs to someone who does not own that domain.
+    // Not through domain.account_id any more: a platform mailbox belongs to someone who owns no domain.
     accountId: uuid('account_id')
       .notNull()
       .references(() => account.id, { onDelete: 'cascade' }),
@@ -98,8 +95,7 @@ export const mailbox = pgTable(
   ],
 );
 
-// Refresh tokens for panel sessions opened with a mailbox password. Only the hash is stored,
-// so a database read cannot resume anyone's session.
+// Refresh tokens for mailbox-password sessions; only the hash, so a DB read resumes nothing.
 export const mailboxSession = pgTable(
   'mailbox_session',
   {
@@ -148,8 +144,7 @@ export const sentMessage = pgTable(
   },
   (table) => [
     index('idx_sent_message_mailbox').on(table.mailboxId, table.sentAt.desc()),
-    // The milter reports the same message again as its status settles, so it needs a
-    // natural key to upsert on.
+    // The milter reports again as the status settles, so it needs a natural key to upsert on.
     uniqueIndex('uq_sent_message_mailbox_message_recipient').on(
       table.mailboxId,
       table.messageId,
@@ -170,12 +165,10 @@ export const receivedMessage = pgTable(
     messageId: varchar('message_id', { length: 998 }).notNull(),
     imapUid: bigint('imap_uid', { mode: 'number' }),
     sender: varchar('sender', { length: 320 }).notNull(),
-    // Null for a delivered message: the notify pipe reports who wrote it, not who it was
-    // addressed to. Filled for Sent and Drafts, where the recipient is what a list shows.
+    // Null when delivered: the pipe reports the sender. Filled for Sent and Drafts, where a list shows it.
     recipient: varchar('recipient', { length: 320 }),
     subject: text('subject'),
-    // The parent's Message-ID, and the id of the conversation's first message. Threading a
-    // reply is a header chain; keeping the root here turns grouping into one predicate.
+    // The parent's Message-ID and the conversation root: grouping becomes one predicate, not a header walk.
     inReplyTo: varchar('in_reply_to', { length: 998 }),
     threadId: varchar('thread_id', { length: 998 }),
     receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
@@ -190,8 +183,7 @@ export const receivedMessage = pgTable(
       table.folder,
       table.receivedAt.desc(),
     ),
-    // Folder is part of the key: a message sent to yourself is genuinely in INBOX and in
-    // Sent, with one Message-ID. Keying without the folder let one copy overwrite the other.
+    // Folder is part of the key: self-addressed mail is in INBOX and Sent under one Message-ID.
     uniqueIndex('uq_received_message_mailbox_folder_message_id').on(
       table.mailboxId,
       table.folder,
@@ -205,9 +197,8 @@ export const receivedMessage = pgTable(
   ],
 );
 
-// Bytes live on disk; only the pointer is here. Keyed by the outgoing Message-ID rather
-// than by sent_message: that row is written by the milter, well after the send path has
-// already put the file on disk. A null message_id is a draft the composer has not sent yet.
+// Only the pointer; the bytes are on disk. Keyed by Message-ID, not sent_message, which the
+// milter writes long after the file exists. Null message_id is an unsent draft.
 export const attachment = pgTable(
   'attachment',
   {
@@ -316,26 +307,22 @@ export const providerFeedback = pgTable(
   ],
 );
 
-// Postfix and Dovecot read these directly and never learn that `account` exists, so
-// suspending an account cuts off mail and login in one write. `.existing()` keeps
-// drizzle-kit off them: the CREATE VIEWs are hand-written in the migration.
+// Read directly by Postfix and Dovecot, which never learn `account` exists, so a suspension
+// cuts mail and login in one write. `.existing()` keeps drizzle-kit off the hand-written views.
 
 export const vPostfixDomains = pgView('v_postfix_domains', {
   name: varchar('name', { length: 253 }).notNull(),
 }).existing();
 
-// Gated on verified_at too: authenticating is what reaches submission, so an unverified
-// domain left here could send before proving control. The account is reached through
-// mailbox.account_id, not through the domain's owner, so a mailbox on a platform domain
-// still disappears the moment its own account is suspended.
+// Gated on verified_at too, or an unverified domain could authenticate and send before proving
+// control. The account comes through mailbox.account_id, so a platform mailbox still disappears.
 export const vDovecotUsers = pgView('v_dovecot_users', {
   email: text('email').notNull(),
   passwordHash: text('password_hash').notNull(),
   quotaMb: integer('quota_mb').notNull(),
 }).existing();
 
-// smtpd_sender_login_maps + reject_sender_login_mismatch. Without it, authenticating would
-// let one tenant send as another's verified domain, DKIM-signed by us.
+// smtpd_sender_login_maps + reject_sender_login_mismatch: without it any tenant sends as another's.
 export const vPostfixSenders = pgView('v_postfix_senders', {
   email: text('email').notNull(),
   owner: text('owner').notNull(),

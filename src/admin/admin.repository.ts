@@ -4,8 +4,7 @@ import { desc, eq, sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/db';
 import { account, domain, mailbox } from '../database/schema';
 
-// The one module that does not filter by accountId, because listing every tenant is the
-// point. Nothing outside admin/ may query this way - see AGENTS.md.
+// The one module that does not filter by accountId; nothing outside admin/ may - see AGENTS.md.
 @Injectable()
 export class AdminRepository {
   constructor(@Inject(DATABASE) private readonly db: Database) {}

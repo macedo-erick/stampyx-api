@@ -10,9 +10,8 @@ export interface OwnedMailbox extends Mailbox {
   readonly domainVerifiedAt: Date | null;
 }
 
-// What PrincipalGuard needs to decide whether a mailbox session is still good for. Mirrors
-// the conditions in v_dovecot_users: if the mail server would refuse this login, the panel
-// has to refuse it too.
+// What PrincipalGuard needs to judge a mailbox session, mirroring v_dovecot_users: what the
+// mail server would refuse, the panel refuses too.
 export interface MailboxStanding extends OwnedMailbox {
   readonly domainActive: boolean;
   readonly accountStatus: string;
@@ -32,9 +31,8 @@ export class MailboxRepository {
     return this.select().where(eq(mailbox.accountId, accountId)).orderBy(mailbox.localPart);
   }
 
-  // Ownership is a join predicate, so someone else's mailbox simply does not come back.
-  // It hangs off the mailbox now, not the domain: a mailbox on a platform domain belongs to
-  // someone who does not own that domain.
+  // Ownership is a join predicate, so someone else's row never comes back. It hangs off the
+  // mailbox, not the domain: a platform mailbox belongs to someone who owns no domain.
   async findOwned(accountId: string, id: string): Promise<OwnedMailbox | null> {
     const [row] = await this.select()
       .where(and(eq(mailbox.id, id), eq(mailbox.accountId, accountId)))
@@ -68,8 +66,7 @@ export class MailboxRepository {
     return row !== undefined;
   }
 
-  // System-level, deliberately not account-scoped: the Sieve reconciler runs at boot on
-  // behalf of nobody. Nothing request-facing may use it.
+  // Not account-scoped: the Sieve reconciler runs at boot for nobody. Nothing request-facing may use it.
   async listAllActive(): Promise<OwnedMailbox[]> {
     return this.select().where(eq(mailbox.active, true));
   }

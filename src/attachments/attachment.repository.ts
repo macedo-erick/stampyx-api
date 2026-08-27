@@ -72,8 +72,7 @@ export class AttachmentRepository {
     await this.db.delete(attachment).where(eq(attachment.id, id));
   }
 
-  // Drafts nobody sent. The composer can be closed without a trace, so the rows and their
-  // files would otherwise accumulate forever.
+  // The composer can be closed without a trace, so unsent rows and files accumulate forever.
   async findStaleDrafts(before: Date): Promise<Attachment[]> {
     return this.db
       .select()

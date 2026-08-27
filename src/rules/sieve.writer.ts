@@ -22,9 +22,8 @@ export class SieveWriter {
 
   constructor(@Inject(CONFIG) private readonly config: Config) {}
 
-  // Compares content, not existence: a fix to the generator has to reach mailboxes whose
-  // script was written by the older one, and those are exactly the ones that already have a
-  // file. Checking only for a missing file left every existing mailbox on the old script.
+  // Content, not existence: a generator fix has to reach the mailboxes that already have a file,
+  // and checking only for a missing one left every existing mailbox on the old script.
   async isCurrent(target: SieveTarget, rules: readonly FolderRule[]): Promise<boolean> {
     try {
       const onDisk = await readFile(this.pathFor(target), 'utf8');
@@ -50,9 +49,8 @@ export class SieveWriter {
 
     await mkdir(dir, { recursive: true });
 
-    // Write then rename: Dovecot may be reading the script while we replace it, and a
-    // partially-written file would fail every delivery until the next edit. The staged copy
-    // is compiled first, so a script that will not compile never reaches the live path.
+    // Write then rename: Dovecot may be reading it, and a half-written file fails every delivery.
+    // The staged copy is compiled first, so a broken script never reaches the live path.
     const staging = `${file}.staged`;
     await writeFile(staging, script, 'utf8');
     await this.compile(staging);
@@ -65,10 +63,9 @@ export class SieveWriter {
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
 
-      // sievec lives in the Dovecot image and reads Dovecot's config; in the API container
-      // it either is missing or cannot find one. That is an environment fact, not a bad
-      // script, and it must not fail a rule save - Dovecot compiles the script itself on
-      // first delivery. Only a genuine rejection of the script is worth refusing over.
+      // sievec reads Dovecot's config and in the API container is missing or cannot find one. That
+      // is an environment fact, not a bad script, and Dovecot compiles on first delivery anyway,
+      // so only a genuine rejection is worth refusing a rule save over.
       if (isUnavailable(reason)) {
         this.logger.warn(
           `sievec unavailable here, leaving ${file} for Dovecot to compile: ${reason}`,

@@ -13,8 +13,7 @@ import { DATABASE, type Database, createDatabase } from './database/db';
 import { MIGRATIONS_FOLDER } from './database/migrate';
 import { account } from './database/schema';
 
-// Stands in for JwtGuard, so it produces the same two identities the real one does. Standing
-// is still decided by PrincipalGuard against real rows: nothing here shortcuts that.
+// Stands in for JwtGuard with the same two identities; PrincipalGuard still decides standing.
 export class FakeAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();

@@ -95,8 +95,7 @@ export class AttachmentService {
     this.logger.log({ event: 'attachment.deleted', mailboxId, attachmentId: id });
   }
 
-  // Used by the send path: resolves the drafts, refusing anything that is not this
-  // mailbox's or is already attached to a sent message.
+  // The send path: refuses anything not this mailbox's, or already on a sent message.
   async claim(mailboxId: string, ids: readonly string[]): Promise<Attachment[]> {
     const rows = await this.repository.findDrafts(mailboxId, ids);
 

@@ -17,8 +17,7 @@ export function checkInputFor(row: Domain, config: Config): DnsCheckInput {
 export function dnsRecordsFor(row: Domain, config: Config): DnsRecordResponse[] {
   return (
     requiredRecords(checkInputFor(row, config), row.verificationToken)
-      // A platform domain is seeded verified, so it never publishes a challenge: asking for one
-      // would be asking us to prove control of our own domain to ourselves.
+      // Seeded verified, so no challenge: it would be proving control of our own domain to ourselves.
       .filter((record) => row.kind !== 'platform' || !record.host.startsWith(CHALLENGE_PREFIX))
       .map((record) => ({
         ...record,

@@ -68,8 +68,7 @@ export class RuleRepository {
     return deleted.length > 0;
   }
 
-  // Two passes in one transaction: positions are unique per mailbox only by convention, but
-  // shifting them one at a time still collides with the rows not yet moved.
+  // Two passes in one transaction: shifting one at a time collides with the rows not yet moved.
   async reorder(mailboxId: string, ruleIds: readonly string[]): Promise<FolderRule[]> {
     return this.db.transaction(async (tx) => {
       await tx

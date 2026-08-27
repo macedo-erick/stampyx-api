@@ -148,8 +148,7 @@ function checkMx(records: { exchange: string; priority: number }[], hostname: st
   return { name: 'MX', status: points ? 'ok' : 'mismatch', expected, found };
 }
 
-// Set in the VPS provider's panel, not the domain's DNS, so it survives getting everything
-// else right.
+// Set in the VPS provider's panel, not the domain's DNS, so it outlives getting the rest right.
 function checkPtr(names: string[], hostname: string): CheckResult {
   if (names.length === 0) {
     return { name: 'PTR', status: 'missing', expected: hostname, found: null };

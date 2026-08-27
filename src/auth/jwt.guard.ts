@@ -20,9 +20,8 @@ declare module 'express' {
   }
 }
 
-// Two issuers reach this guard: Keycloak, for people who registered themselves, and stampyx
-// itself, for mailbox users an administrator provisioned. The issuer decides which key
-// verifies the token; nothing is trusted before that.
+// Two issuers: Keycloak for self-registered people, stampyx for provisioned mailbox users.
+// The issuer picks the verifying key; nothing is trusted before that.
 @Injectable()
 export class JwtGuard implements CanActivate {
   private readonly logger = new Logger(JwtGuard.name);

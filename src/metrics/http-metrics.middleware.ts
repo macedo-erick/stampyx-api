@@ -9,15 +9,13 @@ type Labels = 'method' | 'route' | 'status_code';
 
 const UNMEASURED = new Set(['/metrics', '/health']);
 
-// Middleware rather than an interceptor: guards run before interceptors, so an interceptor
-// never sees a rejected request and every 401 would go uncounted.
+// Not an interceptor: guards run first, so an interceptor never sees a 401 to count.
 @Injectable()
 export class HttpMetricsMiddleware implements NestMiddleware {
   constructor(@InjectMetric(HTTP_REQUEST_DURATION) private readonly duration: Histogram<Labels>) {}
 
   use(request: Request, response: Response, next: NextFunction): void {
-    // `originalUrl`, not `path`: the middleware is mounted, so `path` is relative to the
-    // mount point and never matches these.
+    // `originalUrl`, not `path`: mounted middleware makes `path` relative and it never matches.
     if (UNMEASURED.has(request.originalUrl.split('?')[0] ?? '')) {
       next();
 
@@ -38,8 +36,7 @@ export class HttpMetricsMiddleware implements NestMiddleware {
   }
 }
 
-// The route template, never the concrete path: one series per endpoint rather than one per
-// list id, which would make the metric unbounded within a week of real use.
+// The route template, never the concrete path, or the metric is unbounded within a week.
 function routeOf(request: Request): string {
   const route = (request as { route?: { path?: string } }).route?.path;
 

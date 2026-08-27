@@ -13,8 +13,7 @@ const schema = z.object({
   KEYCLOAK_ISSUER_URI: z.url().default('http://localhost:8093/auth/realms/stampyx'),
   KEYCLOAK_JWKS_URI: z.url().optional(),
 
-  // Verifying tokens the UI presents is KEYCLOAK_ISSUER_URI above; this is the other direction,
-  // the API calling Keycloak's Admin API on its own behalf to read and edit /me.
+  // The other direction from KEYCLOAK_ISSUER_URI: the API calling Keycloak's Admin API for /me.
   KEYCLOAK_SERVER_URL: z.url().default('http://localhost:8093/auth'),
   KEYCLOAK_REALM: z.string().min(1).default('stampyx'),
   KEYCLOAK_ADMIN_CLIENT_ID: z.string().min(1).default('stampyx-api-admin'),
@@ -22,8 +21,7 @@ const schema = z.object({
 
   STAMPYX_PROVISIONING_SECRET: z.string().min(1).default('local-dev-secret'),
 
-  // Shared with the Postfix milter and the Sieve notify script, which are our own containers
-  // on our own subnet; nginx has no route to /internal at all.
+  // Shared with the milter and the Sieve notify script, on our own subnet; nginx has no /internal route.
   MAIL_INTERNAL_SECRET: z.string().min(1).default('local-dev-secret'),
 
   // Compared against live DNS by dns-check, so a wrong value fails every domain.
@@ -46,8 +44,7 @@ const schema = z.object({
   // 25MB: what Gmail and Outlook enforce on the receiving side anyway.
   MAIL_MAX_ATTACHMENT_BYTES: z.coerce.number().int().positive().default(26_214_400),
 
-  // Domains the platform itself owns, where consumers get an address. Seeded verified: their
-  // DNS is published by us, not proved by a challenge TXT.
+  // Where consumers get an address. Seeded verified: we publish the DNS, so there is no challenge.
   STAMPYX_PLATFORM_DOMAINS: z
     .string()
     .default('')
@@ -76,8 +73,7 @@ const schema = z.object({
         .filter((origin) => origin !== ''),
     ),
 
-  // No approval surface exists yet, so gating every signup would brick the product.
-  // Phase 8 turns this off in the same change that ships the admin approval path.
+  // No approval surface yet, so gating signup would brick the product; phase 8 turns it off.
   STAMPYX_ACCOUNT_AUTO_APPROVE: z
     .enum(['true', 'false', '1', '0'])
     .default('true')
