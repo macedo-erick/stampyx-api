@@ -107,9 +107,17 @@ export function recordFailure(
   carrier.failureReason = reason;
 }
 
-function errorOf(error: Error): Record<string, unknown> {
+// pino-http wraps a custom `err` serializer around the standard one, so what arrives here is
+// pino's already-flattened error shape -- `type`, not an Error with a `name`.
+interface SerializedError {
+  readonly type?: string;
+  readonly message?: string;
+  readonly stack?: string;
+}
+
+function errorOf(error: SerializedError): Record<string, unknown> {
   const carried: Record<string, unknown> = {
-    type: error.name,
+    type: error.type,
     message: error.message,
     stack: error.stack,
   };
