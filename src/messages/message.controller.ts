@@ -20,6 +20,10 @@ import { MailboxScopeGuard } from '../auth/mailbox-scope.guard';
 import type { PageResponse } from '../common/page-response';
 import { zodBody, zodQuery } from '../common/zod-validation.pipe';
 import {
+  type BulkDeleteRequest,
+  type BulkMoveRequest,
+  type BulkReadRequest,
+  type BulkResult,
   type ListMessagesQuery,
   type MessageDetail,
   type MessageSummary,
@@ -27,6 +31,9 @@ import {
   type SaveDraftRequest,
   type SendMessageRequest,
   type SetReadRequest,
+  bulkDeleteSchema,
+  bulkMoveSchema,
+  bulkReadSchema,
   listMessagesSchema,
   moveMessageSchema,
   saveDraftSchema,
@@ -47,6 +54,34 @@ export class MessageController {
     @Query(zodQuery(listMessagesSchema)) query: ListMessagesQuery,
   ): Promise<PageResponse<MessageSummary>> {
     return this.service.list(accountId, mailboxId, query);
+  }
+
+  @Put('bulk/read')
+  bulkMarkRead(
+    @CurrentAccount() accountId: string,
+    @Param('mailboxId', ParseUUIDPipe) mailboxId: string,
+    @Body(zodBody(bulkReadSchema)) body: BulkReadRequest,
+  ): Promise<BulkResult> {
+    return this.service.bulkMarkRead(accountId, mailboxId, body.ids, body.read);
+  }
+
+  @Put('bulk/folder')
+  bulkMove(
+    @CurrentAccount() accountId: string,
+    @Param('mailboxId', ParseUUIDPipe) mailboxId: string,
+    @Body(zodBody(bulkMoveSchema)) body: BulkMoveRequest,
+  ): Promise<BulkResult> {
+    return this.service.bulkMove(accountId, mailboxId, body.ids, body.folder);
+  }
+
+  @Post('bulk/delete')
+  @HttpCode(200)
+  bulkRemove(
+    @CurrentAccount() accountId: string,
+    @Param('mailboxId', ParseUUIDPipe) mailboxId: string,
+    @Body(zodBody(bulkDeleteSchema)) body: BulkDeleteRequest,
+  ): Promise<BulkResult> {
+    return this.service.bulkRemove(accountId, mailboxId, body.ids);
   }
 
   @Get(':id/attachments/:index')

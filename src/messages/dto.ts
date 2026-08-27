@@ -35,6 +35,22 @@ export type MoveMessageRequest = z.infer<typeof moveMessageSchema>;
 export const setReadSchema = z.object({ read: z.boolean() });
 export type SetReadRequest = z.infer<typeof setReadSchema>;
 
+const bulkIds = z.array(z.uuid()).min(1).max(200);
+
+export const bulkReadSchema = z.object({ ids: bulkIds, read: z.boolean() });
+export type BulkReadRequest = z.infer<typeof bulkReadSchema>;
+
+export const bulkMoveSchema = z.object({ ids: bulkIds, folder: moveMessageSchema.shape.folder });
+export type BulkMoveRequest = z.infer<typeof bulkMoveSchema>;
+
+export const bulkDeleteSchema = z.object({ ids: bulkIds });
+export type BulkDeleteRequest = z.infer<typeof bulkDeleteSchema>;
+
+export interface BulkResult {
+  readonly processed: readonly string[];
+  readonly failed: readonly string[];
+}
+
 export interface MessageSummary {
   readonly id: string;
   readonly messageId: string;
