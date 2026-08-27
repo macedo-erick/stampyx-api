@@ -20,8 +20,6 @@ declare module 'express' {
   }
 }
 
-// Two issuers: Keycloak for self-registered people, stampyx for provisioned mailbox users.
-// The issuer picks the verifying key; nothing is trusted before that.
 @Injectable()
 export class JwtGuard implements CanActivate {
   private readonly logger = new Logger(JwtGuard.name);
@@ -48,7 +46,6 @@ export class JwtGuard implements CanActivate {
   }
 
   async identify(token: string): Promise<Identity> {
-    // Read only to route. The claim is unverified here and is thrown away either way.
     if (unverifiedIssuer(token) === MAILBOX_ISSUER) {
       return this.mailboxTokens.verify(token);
     }

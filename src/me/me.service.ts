@@ -34,7 +34,6 @@ export class MeService {
         suggestion.localPart,
       );
     } catch {
-      // Taken or reserved: the onboarding screen takes over and they pick another.
       return null;
     }
   }
@@ -66,9 +65,6 @@ export class MeService {
     let mailboxes = await this.mailboxes.listForAccount(principal.accountId);
     let platformAddress = mailboxes.find((row) => row.platform) ?? null;
 
-    // Signing up already named an address, so confirming it in a form is ceremony. Claimed on the
-    // panel's first call because account creation cannot reach mailboxes without a cycle.
-    // Idempotent, and falls through to onboarding when the name is taken.
     if (platformAddress === null && offered.length > 0) {
       const claimed = await this.autoClaim(principal.accountId, account.email, offered);
 

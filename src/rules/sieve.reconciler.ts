@@ -4,9 +4,6 @@ import { MailboxRepository } from '../mailboxes/mailbox.repository';
 import { RuleRepository } from './rule.repository';
 import { SieveWriter } from './sieve.writer';
 
-// The script carries the notify pipe, the only record of an incoming message. Creation covers
-// new mailboxes; this covers the existing ones, and rewrites whatever the generator now
-// produces differently, or a fix never reaches a mailbox that already has a file.
 @Injectable()
 export class SieveReconciler implements OnModuleInit {
   private readonly logger = new Logger(SieveReconciler.name);
@@ -38,7 +35,6 @@ export class SieveReconciler implements OnModuleInit {
         await this.sieve.write(target, rules);
         written += 1;
       } catch (error) {
-        // One unwritable mailbox must not stop the rest, nor the boot.
         this.logger.warn({
           event: 'sieve.reconcile_failed',
           mailboxId: row.id,

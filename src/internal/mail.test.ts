@@ -110,7 +110,6 @@ it('is idempotent, because Sieve runs before delivery is confirmed', async () =>
     .where(eq(receivedMessage.mailboxId, mailboxId));
 
   expect(rows).toHaveLength(1);
-  // The second delivery must not fire a second toast in the panel.
   expect(emit).toHaveBeenCalledTimes(1);
 });
 

@@ -28,7 +28,6 @@ export class FolderRepository {
     return rows.map((row) => ({ folder: row.folder, total: row.total, unread: row.unread }));
   }
 
-  // Rules that would break if the folder went away: the Sieve script names it as a target.
   async ruleTargets(mailboxId: string): Promise<{ folder: string; total: number }[]> {
     const rows = await this.db
       .select({ folder: folderRule.targetFolder, total: count() })
@@ -41,7 +40,6 @@ export class FolderRepository {
       .map((row) => ({ folder: row.folder, total: row.total }));
   }
 
-  // The folder and everything under it, as IMAP does; the separator is the server's, so passed in.
   private subtree(mailboxId: string, path: string, delimiter: string) {
     return and(
       eq(receivedMessage.mailboxId, mailboxId),
@@ -58,13 +56,11 @@ export class FolderRepository {
     await this.db
       .update(receivedMessage)
       .set({
-        // Explicit casts: Postgres cannot infer a bare parameter beside ||, and the statement fails to plan.
         folder: sql`${target}::text || substring(${receivedMessage.folder} from ${path.length + 1}::int)`,
       })
       .where(this.subtree(mailboxId, path, delimiter));
   }
 
-  // Dovecot already destroyed the messages, so any row left behind is a phantom in the list.
   async deleteSubtree(mailboxId: string, path: string, delimiter: string): Promise<void> {
     await this.db.delete(receivedMessage).where(this.subtree(mailboxId, path, delimiter));
   }

@@ -4,7 +4,6 @@ import { desc, eq, sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/db';
 import { account, domain, mailbox } from '../database/schema';
 
-// The one module that does not filter by accountId; nothing outside admin/ may - see AGENTS.md.
 @Injectable()
 export class AdminRepository {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
@@ -18,7 +17,6 @@ export class AdminRepository {
         plan: account.plan,
         status: account.status,
         createdAt: account.createdAt,
-        // count(distinct ...) because the two left joins multiply each other's rows.
         domainCount: sql<number>`count(distinct ${domain.id})::int`,
         mailboxCount: sql<number>`count(distinct ${mailbox.id})::int`,
       })

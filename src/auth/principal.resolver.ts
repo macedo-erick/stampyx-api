@@ -4,7 +4,6 @@ import { AccountService } from '../accounts/account.service';
 import { MailboxRepository } from '../mailboxes/mailbox.repository';
 import type { Identity, Principal } from './principal';
 
-// Shared with the WebSocket gateway, so a socket faces the same standing checks as a request.
 @Injectable()
 export class PrincipalResolver {
   constructor(
@@ -25,7 +24,6 @@ export class PrincipalResolver {
       throw new UnauthorizedException('This session is no longer valid');
     }
 
-    // The conditions v_dovecot_users applies: what the mail server refuses, the panel refuses.
     if (!standing.active) {
       throw new ForbiddenException('This mailbox is disabled');
     }

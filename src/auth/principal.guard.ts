@@ -41,7 +41,6 @@ export const CurrentPrincipal = createParamDecorator(
   },
 );
 
-// Ownership is still an accountId whichever principal supplied it, so signatures are unchanged.
 export const CurrentAccount = createParamDecorator((_data: unknown, context: ExecutionContext) => {
   const request = context.switchToHttp().getRequest<Request>();
   const accountId = request.principal?.accountId;

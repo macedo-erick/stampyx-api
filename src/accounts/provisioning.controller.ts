@@ -22,10 +22,8 @@ import {
   verifyProvisioningSignature,
 } from './provisioning-signature';
 
-// Covers the SPI's 1s/4s/15s retry schedule without leaving a captured body replayable.
 const MAX_SKEW_MS = 5 * 60 * 1000;
 
-// nginx pins this location to the auth subnet; the signature is the second lock.
 @Controller('internal/keycloak')
 export class ProvisioningController {
   private readonly logger = new Logger(ProvisioningController.name);

@@ -12,8 +12,6 @@ import { MailboxTokenService } from './mailbox-token.service';
 import { PrincipalGuard } from './principal.guard';
 import { PrincipalResolver } from './principal.resolver';
 
-// Global, and re-exports what the guards inject: an enhancer is constructed in its host
-// controller's module, and importing AuthModule in each would cycle through MailboxesModule.
 @Global()
 @Module({
   imports: [AccountsModule, MailboxesModule],

@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-// Validated without the separator and joined here, so no caller can smuggle in a path.
 export const FOLDER_SEPARATOR = '/';
 
 const folderName = z
@@ -15,7 +14,6 @@ const folderName = z
     message: 'must not contain control characters or IMAP wildcards',
   });
 
-// % and * are IMAP LIST wildcards; control characters would break the protocol line.
 function isUnsafe(character: string): boolean {
   const code = character.codePointAt(0) ?? 0;
 
@@ -36,9 +34,7 @@ export interface FolderResponse {
   readonly parent: string | null;
   readonly total: number;
   readonly unread: number;
-  // A folder Dovecot creates and the panel must not let anyone rename or delete.
   readonly system: boolean;
-  // The IMAP SPECIAL-USE flag, so the panel can find Archive or Trash without guessing.
   readonly specialUse: string | null;
   readonly ruleCount: number;
 }

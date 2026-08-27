@@ -1,6 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-// Named for planelyx, which ships it: renaming means hand-editing eventsListeners on every realm.
 export const PROVISIONING_SIGNATURE_HEADER = 'x-planelyx-signature';
 
 export function verifyProvisioningSignature(
@@ -16,7 +15,6 @@ export function verifyProvisioningSignature(
   const presented = Buffer.from(header, 'utf8');
   const computed = Buffer.from(expected, 'utf8');
 
-  // timingSafeEqual throws on a length mismatch; === would leak how much was right.
   if (presented.length !== computed.length) {
     return false;
   }

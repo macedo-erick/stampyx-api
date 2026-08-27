@@ -84,7 +84,6 @@ it('locks a mailbox out after repeated failures', async () => {
     await login(box.address, 'wrong');
   }
 
-  // Even the correct password is refused now, so guessing cannot simply be resumed.
   const locked = await login(box.address, PASSWORD);
 
   expect(locked.status).toBe(429);
@@ -149,7 +148,6 @@ it('changes the mail password and drops every other session', async () => {
 
   expect(sessions).toHaveLength(0);
 
-  // The same column Dovecot reads, so the mail client password changed with the panel one.
   const [row] = await harness.db.select().from(mailbox).where(eq(mailbox.id, box.id));
 
   await expect(
@@ -193,7 +191,6 @@ it('hides a sibling mailbox on the same domain from a mailbox session', async ()
     undefined,
     headers,
   );
-  // Both mailboxes belong to the same account, so account-scoped SQL alone would return this.
   const theirs = await call<MailboxResponse>(
     harness,
     'unused',

@@ -22,8 +22,6 @@ export class AccountService {
     private readonly repository: AccountRepository,
   ) {}
 
-  // 403 not 401: the credential is fine, the standing is not, and 401 would send the UI
-  // into a re-login loop.
   async requireActive(user: KeycloakIdentity): Promise<Account> {
     const found = (await this.repository.findBySub(user.sub)) ?? (await this.selfProvision(user));
 
@@ -38,8 +36,6 @@ export class AccountService {
     return found;
   }
 
-  // At-least-once also means zero times, if the API was down while Keycloak exhausted its
-  // retries. Without this the user is locked out permanently, recoverable only by hand.
   private async selfProvision(user: KeycloakIdentity): Promise<Account> {
     if (user.email === null) {
       throw new UnauthorizedException('No account is provisioned for this identity');

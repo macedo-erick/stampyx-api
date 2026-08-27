@@ -1,4 +1,3 @@
-// Someone who registered as erick@stampyx.com already told us the address they want.
 export function suggestAddress(
   email: string,
   offered: readonly { id: string; name: string }[],

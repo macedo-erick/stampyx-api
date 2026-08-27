@@ -23,7 +23,6 @@ export interface AvailabilityResponse {
   readonly available: boolean;
 }
 
-// What the panel needs to decide which product surface to draw, in one call.
 export interface MeResponse {
   readonly kind: 'account' | 'mailbox';
   readonly admin: boolean;
@@ -31,10 +30,7 @@ export interface MeResponse {
   readonly loginEmail: string | null;
   readonly mailboxes: readonly MailboxResponse[];
   readonly platformAddress: string | null;
-  // An account with no address on a platform domain yet, while one is on offer.
   readonly needsAddress: boolean;
-  // Derived from the address they registered with, so someone who signed up as
-  // erick@stampyx.com is offered exactly that rather than an empty field.
   readonly suggestedLocalPart: string | null;
   readonly suggestedDomainId: string | null;
 }

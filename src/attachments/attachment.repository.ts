@@ -18,7 +18,6 @@ export class AttachmentRepository {
     return created;
   }
 
-  // Drafts only: an attachment already tied to a sent message must not be re-sent or deleted.
   async findDrafts(mailboxId: string, ids: readonly string[]): Promise<Attachment[]> {
     if (ids.length === 0) {
       return [];
@@ -72,7 +71,6 @@ export class AttachmentRepository {
     await this.db.delete(attachment).where(eq(attachment.id, id));
   }
 
-  // The composer can be closed without a trace, so unsent rows and files accumulate forever.
   async findStaleDrafts(before: Date): Promise<Attachment[]> {
     return this.db
       .select()

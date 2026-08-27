@@ -6,7 +6,6 @@ import { SignJWT, jwtVerify } from 'jose';
 import { CONFIG, type Config } from '../config';
 import type { MailboxIdentity } from './principal';
 
-// Ours, not Keycloak's: JwtGuard routes on it, so it must never collide with KEYCLOAK_ISSUER_URI.
 export const MAILBOX_ISSUER = 'stampyx';
 const AUDIENCE = 'stampyx-panel';
 
@@ -57,7 +56,6 @@ export class MailboxTokenService {
     }
   }
 
-  // High-entropy random, so SHA-256 is enough; Argon2 would only slow every refresh.
   newRefreshToken(): { token: string; hash: string } {
     const token = randomBytes(32).toString('base64url');
 

@@ -35,8 +35,6 @@ it('keeps spam first and user rules after it', () => {
 it('reports every branch that stops, naming the folder it filed into', () => {
   const script = generateSieve([rule({ action: 'move_to', targetFolder: 'Work' })], OPTIONS);
 
-  // A branch that stops without reporting leaves the message filed but invisible: gone from
-  // the inbox and never listed in the folder either.
   expect(script).toContain('fileinto "Spam";\n    pipe :copy "notify-mail-received.sh" ["Spam"];');
   expect(script).toContain('fileinto "Work";\n    pipe :copy "notify-mail-received.sh" ["Work"];');
   expect(script).toContain('pipe :copy "notify-mail-received.sh" ["INBOX"];');
@@ -104,7 +102,6 @@ it('reports nothing for a rule that stores nothing locally', () => {
   const forwarded = generateSieve([rule({ action: 'forward' })], OPTIONS);
   const discarded = generateSieve([rule({ action: 'discard' })], OPTIONS);
 
-  // Both leave no copy in the mailbox, so there is nothing for the panel to list.
   expect(forwarded).not.toMatch(/redirect[^}]*pipe :copy/);
   expect(discarded).not.toMatch(/discard;[^}]*pipe :copy/);
 });
@@ -123,7 +120,6 @@ it('escapes quotes and backslashes so a value cannot close the string literal', 
   );
 
   expect(script).toContain('\\"');
-  // The injected `discard;` must survive only as inert text inside the quoted value.
   expect(script).not.toMatch(/^\s*discard;$/m);
 });
 

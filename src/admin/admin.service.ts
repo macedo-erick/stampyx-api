@@ -84,7 +84,6 @@ export class AdminService {
   }
 
   async deleteAccount(actorAccountId: string, id: string): Promise<void> {
-    // It would leave a Keycloak user with no account row, which self-provisioning would recreate.
     if (actorAccountId === id) {
       throw new BadRequestException('An administrator cannot delete their own account');
     }

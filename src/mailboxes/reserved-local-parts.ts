@@ -1,5 +1,3 @@
-// postmaster and abuse are RFC 2142; the rest is what a brand uses on its apex. Consumer
-// addresses share that apex, so these would go to whoever signed up first.
 const RESERVED = new Set([
   'postmaster',
   'abuse',

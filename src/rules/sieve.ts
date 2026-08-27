@@ -4,12 +4,10 @@ export interface SieveOptions {
   readonly notifyScript: string;
 }
 
-// Sieve string literals take backslash and double quote escapes and nothing else.
 function quote(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-// :matches also treats * and ? as wildcards, so the intended one is appended outside the escape pass.
 function quoteMatch(value: string, { prefix = '', suffix = '' } = {}): string {
   return `"${prefix}${value.replace(/([\\"*?])/g, '\\$1')}${suffix}"`;
 }
@@ -50,8 +48,6 @@ function condition(rule: FolderRule): string | null {
   }
 }
 
-// Each stopping branch reports for itself. With the pipe only at the end, past every `stop`,
-// a message a rule filed away was never reported and vanished from both inbox and folder.
 function body(rule: FolderRule, notify: string): string[] | null {
   switch (rule.action) {
     case 'move_to':
@@ -62,10 +58,8 @@ function body(rule: FolderRule, notify: string): string[] | null {
             `${notifyCall(notify, rule.targetFolder)};`,
             'stop;',
           ];
-    // No stop: it keeps going and the pipe at the end reports it in INBOX.
     case 'mark_read':
       return ['setflag "\\\\Seen";'];
-    // Nothing is stored locally in either case, so there is nothing to report.
     case 'forward':
       return [`redirect ${quote(rule.conditionValue)};`, 'stop;'];
     case 'discard':
@@ -75,12 +69,10 @@ function body(rule: FolderRule, notify: string): string[] | null {
   }
 }
 
-// An argument, because the pipe runs with a cleared environment and cannot see where it was filed.
 function notifyCall(script: string, folder: string): string {
   return `pipe :copy ${quote(script)} [${quote(folder)}]`;
 }
 
-// Fixed order: spam, user rules, notification. Regenerated whole, so it cannot drift from the table.
 export function generateSieve(rules: readonly FolderRule[], options: SieveOptions): string {
   const lines: string[] = [
     'require ["copy", "fileinto", "imap4flags", "vnd.dovecot.pipe"];',

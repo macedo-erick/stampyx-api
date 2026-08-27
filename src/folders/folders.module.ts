@@ -5,7 +5,6 @@ import { FolderController } from './folder.controller';
 import { FolderRepository } from './folder.repository';
 import { FolderService } from './folder.service';
 
-// MailboxRepository arrives through the global AuthModule; ImapClient from MessagesModule.
 @Module({
   imports: [MessagesModule],
   controllers: [FolderController],

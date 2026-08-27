@@ -2,10 +2,8 @@ import { randomBytes } from 'node:crypto';
 
 import * as argon2 from 'argon2';
 
-// Without the prefix Dovecot falls back to its default scheme and every login fails silently.
 export const DOVECOT_SCHEME = '{ARGON2ID}';
 
-// Dovecot's own argon2id defaults, so a hash written here stays verifiable if it rehashes.
 const OPTIONS = {
   type: argon2.argon2id,
   memoryCost: 65_536,
@@ -27,8 +25,6 @@ export async function verifyMailboxPassword(stored: string, plaintext: string): 
   }
 }
 
-// A consumer signs in through Keycloak, so this fills the NOT NULL column with something
-// nobody holds: IMAP and SMTP refuse the mailbox until a real password is set.
 export async function unusableMailboxPassword(): Promise<string> {
   return hashMailboxPassword(randomBytes(32).toString('base64url'));
 }
