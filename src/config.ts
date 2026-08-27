@@ -33,6 +33,8 @@ const schema = z.object({
   MAIL_MASTER_USER: z.string().min(1).default('stampyx-api'),
   MAIL_MASTER_PASSWORD: z.string().min(1).default('local-dev-secret'),
 
+  MAIL_JUNK_FOLDER: z.string().min(1).default('Junk'),
+
   MAIL_SIEVE_DIR: z.string().min(1).default('/data/sieve'),
   MAIL_ATTACHMENTS_DIR: z.string().min(1).default('/data/attachments'),
 

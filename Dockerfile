@@ -22,7 +22,12 @@ CMD ["yarn", "dev"]
 
 FROM node:24-alpine AS prod
 WORKDIR /app
-RUN addgroup --system app && adduser --system --ingroup app app
+# Dovecot owns the shared sieve volume as vmail (gid 1000) and re-chowns it on every start,
+# so the API cannot own that directory - it has to be a member of the group instead. The base
+# image parks an unused node user on 1000, which has to go first.
+RUN addgroup --system app && adduser --system --ingroup app app \
+ && deluser node && delgroup node 2>/dev/null || true
+RUN addgroup -g 1000 vmail && addgroup app vmail
 ENV NODE_ENV=production
 RUN corepack enable
 RUN apk add --no-cache dovecot-pigeonhole-plugin

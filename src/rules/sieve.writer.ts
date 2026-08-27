@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
@@ -33,7 +33,10 @@ export class SieveWriter {
   }
 
   private scriptFor(rules: readonly FolderRule[]): string {
-    return generateSieve(rules, { notifyScript: 'notify-mail-received.sh' });
+    return generateSieve(rules, {
+      notifyScript: 'notify-mail-received.sh',
+      junkFolder: this.config.MAIL_JUNK_FOLDER,
+    });
   }
 
   pathFor(target: SieveTarget): string {
@@ -46,6 +49,7 @@ export class SieveWriter {
     const script = this.scriptFor(rules);
 
     await mkdir(dir, { recursive: true });
+    await chmod(dir, 0o775);
 
     const staging = `${file}.staged`;
     await writeFile(staging, script, 'utf8');
