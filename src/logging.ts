@@ -24,8 +24,6 @@ const REDACTED_PATHS = [
 
 const KEPT_HEADERS = ['content-type', 'content-length', 'user-agent'];
 
-// A Nest HttpException also carries `response` and `options`, which only repeat the message
-// and status that are already fields of their own here.
 const KEPT_ERROR_FIELDS = ['code', 'errno', 'syscall', 'path', 'status'];
 
 export type WriteEvent =
@@ -88,8 +86,6 @@ interface FailedResponse extends ServerResponse {
   failureReason?: string;
 }
 
-// pino-http already logs one line per request, and without a cause it invents a contentless
-// "failed with status code 500" carrying its own stack. res.err is the hook it reads first.
 export function recordFailure(
   response: ServerResponse,
   status: number,
@@ -107,8 +103,6 @@ export function recordFailure(
   carrier.failureReason = reason;
 }
 
-// pino-http wraps a custom `err` serializer around the standard one, so what arrives here is
-// pino's already-flattened error shape -- `type`, not an Error with a `name`.
 interface SerializedError {
   readonly type?: string;
   readonly message?: string;
@@ -139,8 +133,6 @@ export function loggerOptions(config: Config): Params {
       level: config.LOG_LEVEL,
       redact: { paths: REDACTED_PATHS, censor: '[redacted]' },
 
-      // Otherwise every line logged during a request carries a full copy of that request;
-      // the id joins them back onto the one completion line that has the rest.
       quietReqLogger: true,
 
       genReqId: (request: IncomingMessage, response: ServerResponse): string => {

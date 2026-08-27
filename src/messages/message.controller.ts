@@ -49,7 +49,6 @@ export class MessageController {
     return this.service.list(accountId, mailboxId, query);
   }
 
-  // Streamed, not base64: an attachment is a file and the browser should save it like one.
   @Get(':id/attachments/:index')
   async attachment(
     @CurrentAccount() accountId: string,
@@ -83,7 +82,6 @@ export class MessageController {
     return this.service.read(accountId, mailboxId, id);
   }
 
-  // Never reaches the MTA: composed and appended straight into Drafts.
   @Post('drafts')
   @HttpCode(204)
   saveDraft(

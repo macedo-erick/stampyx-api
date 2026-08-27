@@ -40,7 +40,6 @@ it('gives a fresh account the address it registered with, without asking', async
 
   expect(me.status).toBe(200);
   expect(me.body.kind).toBe('account');
-  // Signing up already named an address; confirming it in a form would be ceremony.
   expect(me.body.needsAddress).toBe(false);
   expect(me.body.platformAddress).toBe(`${sub}@${PLATFORM}`);
 });
@@ -49,7 +48,6 @@ it('falls back to asking when the name it would take is already gone', async () 
   const first = await harness.newAccount();
   const second = await harness.newAccount();
 
-  // Both registered with the same local part, so only the first can have it.
   await harness.db
     .update(account)
     .set({ email: `duplicada@${PLATFORM}` })
@@ -74,7 +72,6 @@ it('claims an address that is deliverable straight away', async () => {
 
   expect(created.status).toBe(201);
   expect(created.body.address).toBe(`joana@${PLATFORM}`);
-  // The platform domain is seeded verified, so there is no DNS step in front of the consumer.
   expect(created.body.deliverable).toBe(true);
   expect(created.body.platform).toBe(true);
 
@@ -93,8 +90,6 @@ it('reaches Dovecot with a password nobody can use until one is set', async () =
   );
 
   expect(rows).toHaveLength(1);
-  // A consumer signs into the panel through Keycloak; IMAP stays shut until they choose a
-  // mail password for an external client.
   await expect(verifyMailboxPassword(rows[0]?.password_hash ?? '', '')).resolves.toBe(false);
 });
 

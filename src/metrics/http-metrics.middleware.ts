@@ -9,13 +9,11 @@ type Labels = 'method' | 'route' | 'status_code';
 
 const UNMEASURED = new Set(['/metrics', '/health']);
 
-// Not an interceptor: guards run first, so an interceptor never sees a 401 to count.
 @Injectable()
 export class HttpMetricsMiddleware implements NestMiddleware {
   constructor(@InjectMetric(HTTP_REQUEST_DURATION) private readonly duration: Histogram<Labels>) {}
 
   use(request: Request, response: Response, next: NextFunction): void {
-    // `originalUrl`, not `path`: mounted middleware makes `path` relative and it never matches.
     if (UNMEASURED.has(request.originalUrl.split('?')[0] ?? '')) {
       next();
 
@@ -36,7 +34,6 @@ export class HttpMetricsMiddleware implements NestMiddleware {
   }
 }
 
-// The route template, never the concrete path, or the metric is unbounded within a week.
 function routeOf(request: Request): string {
   const route = (request as { route?: { path?: string } }).route?.path;
 

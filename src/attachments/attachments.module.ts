@@ -8,7 +8,6 @@ import { AttachmentService } from './attachment.service';
 
 @Module({
   imports: [
-    // Memory storage, then written to MAIL_ATTACHMENTS_DIR under the attachment id.
     MulterModule.registerAsync({
       inject: [CONFIG],
       useFactory: (config: Config) => ({

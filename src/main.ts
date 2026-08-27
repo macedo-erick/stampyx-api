@@ -7,13 +7,11 @@ import { AppModule } from './app.module';
 import { CONFIG, type Config } from './config';
 
 async function bootstrap(): Promise<void> {
-  // The SPI signs the bytes it transmitted; re-serialising parsed JSON would not match.
   const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
   const config = app.get<Config>(CONFIG);
 
   app.useLogger(app.get(Logger));
 
-  // health/metrics are 404'd publicly by nginx; /internal is a fixed path the mail plane calls.
   app.setGlobalPrefix('api', { exclude: ['health', 'metrics', 'internal/(.*)'] });
 
   app.enableCors({

@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import { RULE_ACTIONS, RULE_CONDITION_FIELDS, RULE_CONDITION_OPERATORS } from '../database/schema';
 
-// The DB has the same check, but failing here gives a 400 naming the field instead of a 500.
 export const ruleSchema = z
   .object({
     conditionField: z.enum(RULE_CONDITION_FIELDS),
@@ -42,7 +41,6 @@ export const rulePreviewSchema = z.object({
 export type RulePreviewRequest = z.infer<typeof rulePreviewSchema>;
 
 export interface RulePreviewResponse {
-  // False for `recipient`: the projection keeps the sender, so there is nothing to count against.
   readonly supported: boolean;
   readonly total: number;
   readonly sample: readonly {

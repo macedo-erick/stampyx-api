@@ -17,17 +17,11 @@ export const sendMessageSchema = z.object({
   text: z.string().max(1_000_000).default(''),
   html: z.string().max(2_000_000).optional(),
   inReplyTo: z.string().trim().max(998).optional(),
-  // Draft attachments already uploaded to this mailbox. The total size is checked again
-  // here, because uploads happen one at a time.
   attachmentIds: z.array(z.uuid()).max(20).default([]),
-  // The draft this supersedes, if the composer was opened from one. Saving again replaces
-  // it rather than leaving a trail of half-written copies; sending removes it.
   replacesDraftId: z.uuid().optional(),
 });
 export type SendMessageRequest = z.infer<typeof sendMessageSchema>;
 
-// A draft is unfinished by definition, often with nobody in To yet; requiring a recipient
-// made saving one impossible exactly when it was worth keeping.
 export const saveDraftSchema = sendMessageSchema.extend({
   to: z.array(address).max(50).default([]),
 });
@@ -43,12 +37,9 @@ export type SetReadRequest = z.infer<typeof setReadSchema>;
 
 export interface MessageSummary {
   readonly id: string;
-  // The RFC Message-ID, not the row id: threading a reply needs the one the sender wrote.
   readonly messageId: string;
   readonly sender: string;
-  // Only set for a message this mailbox wrote, where a list shows who it went to.
   readonly recipient: string | null;
-  // The first message of the conversation, so replies group under one root.
   readonly threadId: string | null;
   readonly subject: string | null;
   readonly folder: string;
@@ -58,7 +49,6 @@ export interface MessageSummary {
 }
 
 export interface MessageDetail extends MessageSummary {
-  // Only meaningful for a message this mailbox wrote: a draft reopens with these filled in.
   readonly to: readonly string[];
   readonly cc: readonly string[];
   readonly html: string | null;

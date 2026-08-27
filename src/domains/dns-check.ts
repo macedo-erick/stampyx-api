@@ -55,7 +55,6 @@ export function requiredRecords(input: DnsCheckInput, verificationToken: string)
     {
       type: 'TXT',
       host: `_dmarc.${input.domain}`,
-      // p=quarantine, not reject: during warmup you want reports, not hard bounces.
       value: 'v=DMARC1; p=quarantine; rua=mailto:',
       purpose: 'Tells receivers what to do when SPF and DKIM disagree, and where to report.',
     },
@@ -94,7 +93,6 @@ function checkSpf(records: string[], publicIp: string): CheckResult {
     return { name: 'SPF', status: 'missing', expected, found: null };
   }
 
-  // Not a string compare: include:, extra ip4 blocks and a different `all` are all valid.
   const authorised = spf.includes(`ip4:${publicIp}`);
 
   return { name: 'SPF', status: authorised ? 'ok' : 'mismatch', expected, found: spf };
@@ -108,7 +106,6 @@ function checkDkim(records: string[], publicKey: string): CheckResult {
     return { name: 'DKIM', status: 'missing', expected, found: null };
   }
 
-  // Key material only: providers vary tag order and spacing, and several rewrite on save.
   const found = /p=([A-Za-z0-9+/=]+)/.exec(dkim)?.[1] ?? null;
 
   return {
@@ -148,7 +145,6 @@ function checkMx(records: { exchange: string; priority: number }[], hostname: st
   return { name: 'MX', status: points ? 'ok' : 'mismatch', expected, found };
 }
 
-// Set in the VPS provider's panel, not the domain's DNS, so it outlives getting the rest right.
 function checkPtr(names: string[], hostname: string): CheckResult {
   if (names.length === 0) {
     return { name: 'PTR', status: 'missing', expected: hostname, found: null };

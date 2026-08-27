@@ -44,7 +44,6 @@ export class MailboxAuthService {
       input.email.slice(at + 1),
     );
 
-    // Same answer for an unknown address and a wrong password, or this is an enumeration oracle.
     if (found === null) {
       throw new UnauthorizedException('Invalid address or password');
     }
@@ -90,7 +89,6 @@ export class MailboxAuthService {
 
     this.requireUsable(found);
 
-    // Rotated, so a leaked refresh token is good for one use at most.
     await this.sessions.deleteByHash(hash);
 
     return this.issue(found);
@@ -117,7 +115,6 @@ export class MailboxAuthService {
     this.logger.log({ event: 'mailbox.password_changed', mailboxId: found.id });
   }
 
-  // The conditions v_dovecot_users applies: the panel must not accept a login the mail server refuses.
   private requireUsable(found: MailboxStanding): void {
     if (!found.active) {
       throw new ForbiddenException('This mailbox is disabled');

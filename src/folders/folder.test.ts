@@ -13,8 +13,6 @@ import { type TestHarness, call, startTestApp } from '../test-app.fixture';
 import type { FolderResponse } from './dto';
 
 let harness: TestHarness;
-// Stands in for Dovecot: the folder set the server would report, with the separator and
-// SPECIAL-USE flags a real server sends.
 let tree: { path: string; delimiter: string; specialUse: string | null }[];
 let delimiter: string;
 
@@ -28,8 +26,6 @@ beforeAll(async () => {
 
   const client = harness.app.get(ImapClient);
   vi.spyOn(client, 'listFolders').mockImplementation(() => Promise.resolve([...tree]));
-  // Counts come from the server now. An empty answer leaves the projection's own counts in
-  // place, which is what the assertions below are about.
   vi.spyOn(client, 'statusOf').mockResolvedValue(new Map());
   vi.spyOn(client, 'createFolder').mockImplementation((_address, path) => {
     tree.push({ path, delimiter, specialUse: null });
@@ -96,8 +92,6 @@ it('creates a folder that is visible while it is still empty', async () => {
   expect(created.body.path).toBe('Clientes');
   expect(created.body.total).toBe(0);
 
-  // The whole point: the old listing came from the message rows, so a folder with nothing
-  // in it could not be seen or pointed a rule at.
   const listed = await call<FolderResponse[]>(
     harness,
     sub,
@@ -194,8 +188,6 @@ it('refuses to delete a folder a rule files into', async () => {
     { path: 'Clientes' },
   );
 
-  // Deleting it would leave the Sieve script filing into nothing, and the mail would land
-  // back in INBOX with no explanation.
   expect(deleted.status).toBe(409);
   expect(deleted.body.message).toContain('rule');
 });
@@ -223,8 +215,6 @@ it('reports the rule count on the folder it belongs to', async () => {
 });
 
 it('nests with the separator the server reports, not an assumed one', async () => {
-  // Dovecot on Maildir++ hands out '.', and building the path with '/' created a folder
-  // with a literal slash in its name instead of a child.
   delimiter = '.';
   tree = [{ path: 'INBOX', delimiter, specialUse: null }];
 
@@ -247,7 +237,6 @@ it('nests with the separator the server reports, not an assumed one', async () =
 it('treats a folder the server flagged as special as a system folder', async () => {
   const { sub, mailboxId } = await newMailbox('folder-nine.test');
 
-  // Named like a user folder, but carrying \Archive: the name alone would misjudge it.
   tree.push({ path: 'Arquivo', delimiter, specialUse: '\\Archive' });
 
   const listed = await call<FolderResponse[]>(

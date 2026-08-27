@@ -49,7 +49,6 @@ export class RuleController {
     return this.service.create(accountId, mailboxId, body);
   }
 
-  // POST because it carries a candidate rule, not because it changes anything.
   @Post('preview')
   @HttpCode(200)
   preview(

@@ -5,7 +5,6 @@ export interface AttachmentResponse {
   readonly sizeBytes: number;
 }
 
-// What multer hands over; typed here rather than pulling in @types/multer for four fields.
 export interface UploadedFile {
   readonly originalname: string;
   readonly mimetype: string;
