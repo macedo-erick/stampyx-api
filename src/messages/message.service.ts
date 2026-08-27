@@ -24,6 +24,7 @@ import { AttachmentService } from '../attachments/attachment.service';
 import { MESSAGES_SENT } from '../metrics/metrics.module';
 import { WarmupService } from '../warmup/warmup.service';
 import type {
+  BulkResult,
   ListMessagesQuery,
   MessageDetail,
   MessageSummary,
@@ -133,6 +134,62 @@ export class MessageService {
 
     await this.repository.delete(id);
     this.logger.log({ event: 'message.deleted', messageId: id });
+  }
+
+  async bulkMarkRead(
+    accountId: string,
+    mailboxId: string,
+    ids: readonly string[],
+    read: boolean,
+  ): Promise<BulkResult> {
+    await this.requireMailbox(accountId, mailboxId);
+
+    return this.eachInTurn(ids, (id) => this.markRead(accountId, mailboxId, id, read));
+  }
+
+  async bulkMove(
+    accountId: string,
+    mailboxId: string,
+    ids: readonly string[],
+    folder: string,
+  ): Promise<BulkResult> {
+    await this.requireMailbox(accountId, mailboxId);
+
+    return this.eachInTurn(ids, (id) => this.move(accountId, mailboxId, id, folder));
+  }
+
+  async bulkRemove(
+    accountId: string,
+    mailboxId: string,
+    ids: readonly string[],
+  ): Promise<BulkResult> {
+    await this.requireMailbox(accountId, mailboxId);
+
+    return this.eachInTurn(ids, (id) => this.remove(accountId, mailboxId, id));
+  }
+
+  private async eachInTurn(
+    ids: readonly string[],
+    run: (id: string) => Promise<void>,
+  ): Promise<BulkResult> {
+    const processed: string[] = [];
+    const failed: string[] = [];
+
+    for (const id of ids) {
+      try {
+        await run(id);
+        processed.push(id);
+      } catch (error) {
+        failed.push(id);
+        this.logger.warn({
+          event: 'message.bulk_failed',
+          messageId: id,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return { processed, failed };
   }
 
   async send(

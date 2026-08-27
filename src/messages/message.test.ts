@@ -8,7 +8,7 @@ import { DnsResolver } from '../domains/dns.resolver';
 import type { DomainResponse } from '../domains/dto';
 import type { MailboxResponse } from '../mailboxes/dto';
 import { type TestHarness, call, startTestApp } from '../test-app.fixture';
-import type { MessageDetail, MessageSummary } from './dto';
+import type { BulkResult, MessageDetail, MessageSummary } from './dto';
 import { ImapClient } from './imap.client';
 import { MessageService } from './message.service';
 
@@ -479,4 +479,115 @@ it('validates recipients', async () => {
 
     expect(result.status, JSON.stringify(body)).toBe(400);
   }
+});
+
+it('marks a batch of messages read in one request', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-bulk-read.com');
+  const ids = [await seed(mailboxId), await seed(mailboxId), await seed(mailboxId)];
+
+  const result = await call<BulkResult>(
+    harness,
+    sub,
+    'PUT',
+    `/api/mailboxes/${mailboxId}/messages/bulk/read`,
+    { ids, read: true },
+  );
+
+  expect(result.status).toBe(200);
+  expect(result.body).toEqual({ processed: ids, failed: [] });
+  expect(imap.setSeen).toHaveBeenCalledTimes(3);
+
+  const rows = await harness.db
+    .select()
+    .from(receivedMessage)
+    .where(eq(receivedMessage.mailboxId, mailboxId));
+
+  expect(rows.every((row) => row.read)).toBe(true);
+});
+
+it('moves a batch of messages in one request', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-bulk-move.com');
+  const ids = [await seed(mailboxId), await seed(mailboxId)];
+
+  const result = await call<BulkResult>(
+    harness,
+    sub,
+    'PUT',
+    `/api/mailboxes/${mailboxId}/messages/bulk/folder`,
+    { ids, folder: 'Archive' },
+  );
+
+  expect(result.status).toBe(200);
+  expect(result.body).toEqual({ processed: ids, failed: [] });
+  expect(imap.move).toHaveBeenCalledTimes(2);
+  expect(imap.move).toHaveBeenLastCalledWith('erick@msg-bulk-move.com', 'INBOX', 42, 'Archive');
+
+  const rows = await harness.db
+    .select()
+    .from(receivedMessage)
+    .where(eq(receivedMessage.mailboxId, mailboxId));
+
+  expect(rows).toHaveLength(0);
+});
+
+it('deletes a batch of messages in one request', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-bulk-delete.com');
+  const ids = [await seed(mailboxId), await seed(mailboxId, { folder: 'Trash' })];
+
+  const result = await call<BulkResult>(
+    harness,
+    sub,
+    'POST',
+    `/api/mailboxes/${mailboxId}/messages/bulk/delete`,
+    { ids },
+  );
+
+  expect(result.status).toBe(200);
+  expect(result.body).toEqual({ processed: ids, failed: [] });
+  expect(imap.move).toHaveBeenCalledTimes(1);
+  expect(imap.remove).toHaveBeenCalledTimes(1);
+
+  const rows = await harness.db
+    .select()
+    .from(receivedMessage)
+    .where(eq(receivedMessage.mailboxId, mailboxId));
+
+  expect(rows).toHaveLength(0);
+});
+
+it('carries on past an id belonging to another mailbox and reports it as failed', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-bulk-mixed.com');
+  const stranger = await newMailbox('msg-bulk-stranger.com');
+  const mine = [await seed(mailboxId), await seed(mailboxId)];
+  const theirs = await seed(stranger.mailboxId);
+
+  const result = await call<BulkResult>(
+    harness,
+    sub,
+    'PUT',
+    `/api/mailboxes/${mailboxId}/messages/bulk/read`,
+    { ids: [mine[0], theirs, mine[1]], read: true },
+  );
+
+  expect(result.status).toBe(200);
+  expect(result.body.processed).toEqual(mine);
+  expect(result.body.failed).toEqual([theirs]);
+
+  const [untouched] = await harness.db
+    .select()
+    .from(receivedMessage)
+    .where(eq(receivedMessage.id, theirs));
+
+  expect(untouched?.read).toBe(false);
+});
+
+it('rejects a batch with no ids at all', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-bulk-empty.com');
+
+  const result = await call(harness, sub, 'PUT', `/api/mailboxes/${mailboxId}/messages/bulk/read`, {
+    ids: [],
+    read: true,
+  });
+
+  expect(result.status).toBe(400);
 });

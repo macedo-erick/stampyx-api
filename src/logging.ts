@@ -45,6 +45,7 @@ export type WriteEvent =
   | 'mailbox.password_changed'
   | 'mailbox.session_opened'
   | 'mailbox.sieve_failed'
+  | 'message.bulk_failed'
   | 'message.deleted'
   | 'message.draft_discard_failed'
   | 'message.draft_saved'
