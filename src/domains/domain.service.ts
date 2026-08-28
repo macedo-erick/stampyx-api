@@ -34,7 +34,6 @@ export class DomainService {
   }
 
   async create(accountId: string, name: string): Promise<DomainResponse> {
-    // 409 leaks only that the domain is taken, which its public DNS already says.
     if ((await this.repository.findByName(name)) !== null) {
       throw new ConflictException('That domain is already registered');
     }
@@ -61,7 +60,6 @@ export class DomainService {
     return runDnsCheck(this.dns, this.checkInput(row));
   }
 
-  // Separate from dns-check: until the challenge TXT lands, the views keep this domain out entirely.
   async verify(accountId: string, id: string): Promise<DomainResponse> {
     const row = await this.requireOwned(accountId, id);
 

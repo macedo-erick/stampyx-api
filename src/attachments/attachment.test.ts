@@ -19,7 +19,6 @@ let store: string;
 beforeAll(async () => {
   store = await mkdtemp(path.join(tmpdir(), 'stampyx-attachments-'));
   harness = await startTestApp({
-    // A small ceiling so the limit can be exercised without moving 25 MB around.
     config: { MAIL_ATTACHMENTS_DIR: store, MAIL_MAX_ATTACHMENT_BYTES: 2048 },
   });
 
@@ -78,7 +77,6 @@ it('stores an upload under its own id, never under the name the sender typed', a
 
   expect(created.status).toBe(201);
   expect(created.body.sizeBytes).toBe(64);
-  // The name is metadata; a traversal attempt must not reach the path.
   expect(created.body.fileName).toBe('escape.pdf');
 
   const [row] = await harness.db
@@ -110,7 +108,6 @@ it('leaves an upload unbound until the message actually goes out', async () => {
     .from(attachment)
     .where(eq(attachment.id, created.body.id));
 
-  // No Message-ID to bind to yet, and sent_message waits on the milter.
   expect(row?.messageId).toBeNull();
 
   const listed = await call<AttachmentResponse[]>(

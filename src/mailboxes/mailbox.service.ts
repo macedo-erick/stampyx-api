@@ -21,8 +21,6 @@ export class MailboxService {
   ) {}
 
   async listForDomain(accountId: string, domainId: string): Promise<MailboxResponse[]> {
-    // Explicit, so an unknown domain is 404 rather than an empty list that reads as
-    // "no mailboxes here".
     if ((await this.domains.findOwned(accountId, domainId)) === null) {
       throw new NotFoundException('No such domain');
     }
@@ -60,8 +58,6 @@ export class MailboxService {
       quotaMb: input.quotaMb,
     });
 
-    // The script installs the notify pipe, the only thing that records an incoming message.
-    // Written only on a rule change before, so a mailbox without rules reported nothing.
     await this.installSieve(owned.name, input.localPart);
 
     this.logger.log({ event: 'mailbox.created', mailboxId: created.id, accountId });
@@ -95,7 +91,6 @@ export class MailboxService {
     return !(await this.repository.existsAt(domainId, localPart));
   }
 
-  // The consumer path: the domain belongs to nobody, so the new mailbox carries the account.
   async createOnPlatform(
     accountId: string,
     domainId: string,
@@ -129,7 +124,6 @@ export class MailboxService {
       id: randomUUID(),
       domainId,
       accountId,
-      // No mail password yet: the panel is Keycloak, and IMAP stays shut until the owner sets one.
       passwordHash: await unusableMailboxPassword(),
       localPart,
     });
@@ -162,12 +156,10 @@ export class MailboxService {
     this.logger.log({ event: 'mailbox.deleted', mailboxId: id, accountId });
   }
 
-  // Empty rule set: the generated script still carries the notify pipe, which is the point.
   private async installSieve(domainName: string, localPart: string): Promise<void> {
     try {
       await this.sieve.write({ domainName, localPart }, []);
     } catch (error) {
-      // It still receives mail, but reports no delivery until the next rule change rewrites the script.
       this.logger.warn({
         event: 'mailbox.sieve_failed',
         localPart,

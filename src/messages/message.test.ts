@@ -8,7 +8,7 @@ import { DnsResolver } from '../domains/dns.resolver';
 import type { DomainResponse } from '../domains/dto';
 import type { MailboxResponse } from '../mailboxes/dto';
 import { type TestHarness, call, startTestApp } from '../test-app.fixture';
-import type { MessageDetail, MessageSummary } from './dto';
+import type { BulkResult, MessageDetail, MessageSummary } from './dto';
 import { ImapClient } from './imap.client';
 import { MessageService } from './message.service';
 
@@ -45,15 +45,11 @@ beforeAll(async () => {
     move: vi.spyOn(client, 'move').mockResolvedValue(undefined),
     remove: vi.spyOn(client, 'remove').mockResolvedValue(undefined),
     append: vi.spyOn(client, 'append').mockResolvedValue(undefined),
-    // Every listing reconciles against the server, but these tests seed the projection directly,
-    // so the default is an unreadable source: the mirror serves what it knows. Mirror tests override.
     listMessages: vi
       .spyOn(client, 'listMessages')
       .mockRejectedValue(new Error('imap unavailable in tests')),
   };
 
-  // The service asks the server which folder carries \Sent and which carries \Trash, so a
-  // folder listing has to exist even for the Postgres-backed paths.
   vi.spyOn(client, 'listFolders').mockResolvedValue([
     { path: 'INBOX', delimiter: '/', specialUse: null },
     { path: 'Sent', delimiter: '/', specialUse: '\\Sent' },
@@ -211,8 +207,6 @@ it('drops the projection row when a message moves folder', async () => {
   expect(moved.status).toBe(204);
   expect(imap.move).toHaveBeenCalledWith('erick@msg-move.com', 'INBOX', 42, 'Archive');
 
-  // Carrying the row over would collide with any copy the target already holds - the same
-  // Message-ID is genuinely in Sent and in INBOX. IMAP has it; listing Archive mirrors it back.
   const rows = await harness.db.select().from(receivedMessage).where(eq(receivedMessage.id, id));
 
   expect(rows).toHaveLength(0);
@@ -248,7 +242,6 @@ it('deletes on both sides', async () => {
   const removed = await call(harness, sub, 'DELETE', `/api/mailboxes/${mailboxId}/messages/${id}`);
 
   expect(removed.status).toBe(204);
-  // Delete means Trash, not expunge: only a message already in Trash is destroyed.
   expect(imap.move).toHaveBeenCalled();
   expect(imap.remove).not.toHaveBeenCalled();
 
@@ -261,8 +254,6 @@ it('trashes a message whose Message-ID is already in Trash', async () => {
   const { sub, mailboxId } = await newMailbox('msg-dupe-trash.com');
   const shared = `<${randomUUID()}@example.test>`;
 
-  // A message sent to yourself: one Message-ID, a copy in INBOX and a copy in Sent. Deleting
-  // the second one used to fail the unique key on (mailbox, folder, message_id).
   await seed(mailboxId, { messageId: shared, folder: 'Trash' });
   const id = await seed(mailboxId, { messageId: shared, folder: 'Sent' });
 
@@ -275,8 +266,6 @@ it('collapses two copies of one Message-ID in a folder instead of failing the li
   const { sub, mailboxId } = await newMailbox('msg-dupes.com');
   const shared = '<same-id@example.test>';
 
-  // Dovecot is happy to hold both; Postgres refuses to touch one key twice in an upsert,
-  // which took the whole folder listing down with a 500.
   imap.listMessages.mockResolvedValueOnce([
     {
       uid: 7,
@@ -376,7 +365,6 @@ it('returns the whole conversation with bodies, oldest first', async () => {
   expect(thread.status).toBe(200);
   expect(thread.body.map((row) => row.id)).toEqual([first, second]);
   expect(thread.body.map((row) => row.text)).toEqual(['body', 'body']);
-  // One connection for the conversation, not one per message.
   expect(imap.fetchBodies).toHaveBeenCalledTimes(1);
 });
 
@@ -434,8 +422,6 @@ it('refuses a send once the warmup cap is spent, before reaching the MTA', async
 
   const body = { to: ['someone@example.test'], subject: 'x', text: 'y' };
 
-  // Day one of the curve allows 20; the transport is never reachable in tests, so the
-  // assertion is that the 21st is refused by the cap rather than by a connection error.
   const statuses: number[] = [];
   for (let i = 0; i < 21; i += 1) {
     const result = await call(harness, sub, 'POST', `/api/mailboxes/${mailboxId}/messages`, body);
@@ -450,7 +436,6 @@ it('lists a message sent to yourself once, not once per folder', async () => {
   const { sub, mailboxId } = await newMailbox('msg-thread-dupe.com');
   const root = '<self@example.test>';
 
-  // Delivered to INBOX and filed in Sent: two rows, one Message-ID. Both used to show.
   const inbox = await seed(mailboxId, {
     messageId: root,
     threadId: root,
@@ -468,14 +453,12 @@ it('lists a message sent to yourself once, not once per folder', async () => {
 
   expect(thread.status).toBe(200);
   expect(thread.body).toHaveLength(1);
-  // The copy in the folder being read is the one that stays.
   expect(thread.body[0]?.id).toBe(inbox);
 });
 
 it('saves a draft that has no recipient yet', async () => {
   const { sub, mailboxId } = await newMailbox('msg-draft.com');
 
-  // Half a draft is the normal state of one: a subject and a paragraph, nobody in To yet.
   const saved = await call(harness, sub, 'POST', `/api/mailboxes/${mailboxId}/messages/drafts`, {
     subject: 'Half written',
     text: 'to be continued',
@@ -496,4 +479,115 @@ it('validates recipients', async () => {
 
     expect(result.status, JSON.stringify(body)).toBe(400);
   }
+});
+
+it('marks a batch of messages read in one request', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-bulk-read.com');
+  const ids = [await seed(mailboxId), await seed(mailboxId), await seed(mailboxId)];
+
+  const result = await call<BulkResult>(
+    harness,
+    sub,
+    'PUT',
+    `/api/mailboxes/${mailboxId}/messages/bulk/read`,
+    { ids, read: true },
+  );
+
+  expect(result.status).toBe(200);
+  expect(result.body).toEqual({ processed: ids, failed: [] });
+  expect(imap.setSeen).toHaveBeenCalledTimes(3);
+
+  const rows = await harness.db
+    .select()
+    .from(receivedMessage)
+    .where(eq(receivedMessage.mailboxId, mailboxId));
+
+  expect(rows.every((row) => row.read)).toBe(true);
+});
+
+it('moves a batch of messages in one request', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-bulk-move.com');
+  const ids = [await seed(mailboxId), await seed(mailboxId)];
+
+  const result = await call<BulkResult>(
+    harness,
+    sub,
+    'PUT',
+    `/api/mailboxes/${mailboxId}/messages/bulk/folder`,
+    { ids, folder: 'Archive' },
+  );
+
+  expect(result.status).toBe(200);
+  expect(result.body).toEqual({ processed: ids, failed: [] });
+  expect(imap.move).toHaveBeenCalledTimes(2);
+  expect(imap.move).toHaveBeenLastCalledWith('erick@msg-bulk-move.com', 'INBOX', 42, 'Archive');
+
+  const rows = await harness.db
+    .select()
+    .from(receivedMessage)
+    .where(eq(receivedMessage.mailboxId, mailboxId));
+
+  expect(rows).toHaveLength(0);
+});
+
+it('deletes a batch of messages in one request', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-bulk-delete.com');
+  const ids = [await seed(mailboxId), await seed(mailboxId, { folder: 'Trash' })];
+
+  const result = await call<BulkResult>(
+    harness,
+    sub,
+    'POST',
+    `/api/mailboxes/${mailboxId}/messages/bulk/delete`,
+    { ids },
+  );
+
+  expect(result.status).toBe(200);
+  expect(result.body).toEqual({ processed: ids, failed: [] });
+  expect(imap.move).toHaveBeenCalledTimes(1);
+  expect(imap.remove).toHaveBeenCalledTimes(1);
+
+  const rows = await harness.db
+    .select()
+    .from(receivedMessage)
+    .where(eq(receivedMessage.mailboxId, mailboxId));
+
+  expect(rows).toHaveLength(0);
+});
+
+it('carries on past an id belonging to another mailbox and reports it as failed', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-bulk-mixed.com');
+  const stranger = await newMailbox('msg-bulk-stranger.com');
+  const mine = [await seed(mailboxId), await seed(mailboxId)];
+  const theirs = await seed(stranger.mailboxId);
+
+  const result = await call<BulkResult>(
+    harness,
+    sub,
+    'PUT',
+    `/api/mailboxes/${mailboxId}/messages/bulk/read`,
+    { ids: [mine[0], theirs, mine[1]], read: true },
+  );
+
+  expect(result.status).toBe(200);
+  expect(result.body.processed).toEqual(mine);
+  expect(result.body.failed).toEqual([theirs]);
+
+  const [untouched] = await harness.db
+    .select()
+    .from(receivedMessage)
+    .where(eq(receivedMessage.id, theirs));
+
+  expect(untouched?.read).toBe(false);
+});
+
+it('rejects a batch with no ids at all', async () => {
+  const { sub, mailboxId } = await newMailbox('msg-bulk-empty.com');
+
+  const result = await call(harness, sub, 'PUT', `/api/mailboxes/${mailboxId}/messages/bulk/read`, {
+    ids: [],
+    read: true,
+  });
+
+  expect(result.status).toBe(400);
 });

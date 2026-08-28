@@ -8,15 +8,12 @@ export interface DnsLookups {
   reverse(ip: string): Promise<string[]>;
 }
 
-// A missing name is an empty list, not an exception, and lookups bypass the OS stub cache,
-// where a stale NXDOMAIN would call a correct record wrong.
 @Injectable()
 export class DnsResolver implements DnsLookups {
   private readonly resolver = new Resolver({ timeout: 5_000, tries: 2 });
 
   async txt(name: string): Promise<string[]> {
     try {
-      // TXT arrives as chunks; anything over 255 bytes is split, and a DKIM key always is.
       const records = await this.resolver.resolveTxt(name);
 
       return records.map((chunks) => chunks.join(''));

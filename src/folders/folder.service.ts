@@ -12,7 +12,6 @@ import { ImapClient } from '../messages/imap.client';
 import type { CreateFolderRequest, FolderResponse } from './dto';
 import { FolderRepository } from './folder.repository';
 
-// Fallback only: every real listing carries the server's own delimiter.
 const DEFAULT_DELIMITER = '/';
 
 @Injectable()
@@ -28,7 +27,6 @@ export class FolderService {
   async list(accountId: string, mailboxId: string): Promise<FolderResponse[]> {
     const address = await this.address(accountId, mailboxId);
 
-    // From IMAP, not the message rows: an empty folder is still a folder, and used to be invisible.
     const folders = await this.imap.listFolders(address);
     const counts = new Map(
       (await this.repository.counts(mailboxId)).map((row) => [row.folder, row] as const),
@@ -37,8 +35,6 @@ export class FolderService {
       (await this.repository.ruleTargets(mailboxId)).map((row) => [row.folder, row.total] as const),
     );
 
-    // The server's count for every folder at once. The projection knows only folders already
-    // listed, which is why a badge sat still until you opened the folder it counted.
     const live = await this.liveCounts(address, folders);
 
     return folders
@@ -61,7 +57,6 @@ export class FolderService {
       .sort((a, b) => a.path.localeCompare(b.path));
   }
 
-  // Best effort: losing badges is a nuisance, failing to load is a broken panel. The projection stands in.
   private async liveCounts(
     address: string,
     folders: readonly ImapFolder[],
@@ -95,7 +90,6 @@ export class FolderService {
       throw new NotFoundException('No such parent folder');
     }
 
-    // The separator the server reported: assume it and the folder gets a literal slash in its name.
     const path =
       input.parent === undefined ? input.name : `${input.parent}${delimiter}${input.name}`;
 
@@ -141,7 +135,6 @@ export class FolderService {
 
     this.requireNotSystem(found);
 
-    // A Sieve script filing into a folder that is gone drops the message back in INBOX unexplained.
     const used = (await this.repository.ruleTargets(mailboxId)).find((row) => row.folder === path);
 
     if (used !== undefined) {
@@ -196,7 +189,6 @@ export class FolderService {
   }
 }
 
-// SPECIAL-USE plus INBOX: matching on the name would call a user's own "Archive" a system folder.
 function isSystem(folder: ImapFolder): boolean {
   return folder.path.toUpperCase() === 'INBOX' || folder.specialUse !== null;
 }

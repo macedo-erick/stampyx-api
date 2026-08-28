@@ -5,7 +5,7 @@ import { expect, it } from 'vitest';
 import type { FolderRule } from '../database/schema';
 import { generateSieve } from './sieve';
 
-const OPTIONS = { notifyScript: 'notify-mail-received.sh' };
+const OPTIONS = { notifyScript: 'notify-mail-received.sh', junkFolder: 'Junk' };
 
 function rule(overrides: Partial<FolderRule> = {}): FolderRule {
   return {
@@ -35,9 +35,9 @@ it('keeps spam first and user rules after it', () => {
 it('reports every branch that stops, naming the folder it filed into', () => {
   const script = generateSieve([rule({ action: 'move_to', targetFolder: 'Work' })], OPTIONS);
 
-  // A branch that stops without reporting leaves the message filed but invisible: gone from
-  // the inbox and never listed in the folder either.
-  expect(script).toContain('fileinto "Spam";\n    pipe :copy "notify-mail-received.sh" ["Spam"];');
+  expect(script).toContain(
+    'fileinto :create "Junk";\n    pipe :copy "notify-mail-received.sh" ["Junk"];',
+  );
   expect(script).toContain('fileinto "Work";\n    pipe :copy "notify-mail-received.sh" ["Work"];');
   expect(script).toContain('pipe :copy "notify-mail-received.sh" ["INBOX"];');
 });
@@ -104,7 +104,6 @@ it('reports nothing for a rule that stores nothing locally', () => {
   const forwarded = generateSieve([rule({ action: 'forward' })], OPTIONS);
   const discarded = generateSieve([rule({ action: 'discard' })], OPTIONS);
 
-  // Both leave no copy in the mailbox, so there is nothing for the panel to list.
   expect(forwarded).not.toMatch(/redirect[^}]*pipe :copy/);
   expect(discarded).not.toMatch(/discard;[^}]*pipe :copy/);
 });
@@ -123,7 +122,6 @@ it('escapes quotes and backslashes so a value cannot close the string literal', 
   );
 
   expect(script).toContain('\\"');
-  // The injected `discard;` must survive only as inert text inside the quoted value.
   expect(script).not.toMatch(/^\s*discard;$/m);
 });
 
@@ -160,7 +158,7 @@ it('skips a move_to with no target rather than emitting an uncompilable script',
 
 it('requires copy, which the :copy tag on pipe needs to compile', () => {
   expect(generateSieve([], OPTIONS)).toContain(
-    'require ["copy", "fileinto", "imap4flags", "vnd.dovecot.pipe"];',
+    'require ["copy", "fileinto", "imap4flags", "mailbox", "vnd.dovecot.pipe"];',
   );
 });
 
@@ -170,4 +168,13 @@ it('still produces a valid script when there are no rules at all', () => {
   expect(script).toContain('require [');
   expect(script).toContain('X-Spam-Flag');
   expect(script).toContain('pipe :copy "notify-mail-received.sh" ["INBOX"];');
+});
+
+it('files spam into the configured junk mailbox and requires the extension that creates it', () => {
+  const script = generateSieve([], { ...OPTIONS, junkFolder: 'Lixo' });
+
+  expect(script).toContain('"mailbox"');
+  expect(script).toContain('fileinto :create "Lixo";');
+  expect(script).toContain('pipe :copy "notify-mail-received.sh" ["Lixo"];');
+  expect(script).not.toContain('"Spam"');
 });

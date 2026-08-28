@@ -26,7 +26,6 @@ export class MailboxSessionRepository {
     await this.db.delete(mailboxSession).where(eq(mailboxSession.refreshTokenHash, hash));
   }
 
-  // Every other session dies with a password change; that is why the current one is asked for.
   async deleteForMailbox(mailboxId: string): Promise<void> {
     await this.db.delete(mailboxSession).where(eq(mailboxSession.mailboxId, mailboxId));
   }

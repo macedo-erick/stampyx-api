@@ -14,8 +14,6 @@ export interface MailboxIdentity {
 
 export type Identity = KeycloakIdentity | MailboxIdentity;
 
-// Both arms carry accountId, so every service and repository still filters by account in SQL.
-// Narrowing a mailbox principal to its own mailbox is MailboxScopeGuard's job, not theirs.
 export type Principal =
   | { readonly kind: 'account'; readonly accountId: string; readonly admin: boolean }
   | { readonly kind: 'mailbox'; readonly accountId: string; readonly mailboxId: string };

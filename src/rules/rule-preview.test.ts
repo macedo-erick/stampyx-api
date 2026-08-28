@@ -118,7 +118,6 @@ it('treats a percent in the value as text, not as a wildcard', async () => {
     conditionValue: '%',
   });
 
-  // A bare % reaching LIKE unescaped would match every row.
   expect(result.body.total).toBe(1);
 });
 
@@ -133,8 +132,6 @@ it('says plainly that a recipient rule cannot be previewed', async () => {
     conditionValue: 'vendas@',
   });
 
-  // The rule still works at delivery, where Sieve sees the envelope; received_message
-  // simply does not keep the recipient, so there is nothing here to count.
   expect(result.body.supported).toBe(false);
   expect(result.body.total).toBe(0);
 });

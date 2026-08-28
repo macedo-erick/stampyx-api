@@ -9,7 +9,6 @@ import { dnsRecordsFor } from './dns-records';
 import { DomainRepository } from './domain.repository';
 import type { DnsRecordResponse, PlatformDomainResponse } from './dto';
 
-// Never read: seeded verified, so no challenge. NOT NULL only because customer domains need one.
 const UNUSED_TOKEN = 'stampyx-platform-domain';
 
 @Injectable()
@@ -30,7 +29,6 @@ export class PlatformDomainService implements OnModuleInit {
       const existing = await this.repository.findByName(name);
 
       if (existing !== null) {
-        // It would hand us a domain a customer proved they control, and move its mailboxes onto our DNS.
         if (existing.kind !== 'platform') {
           throw new Error(
             `${name} is listed in STAMPYX_PLATFORM_DOMAINS but is already registered as a customer domain. Remove it from the list or delete the customer domain first.`,
@@ -75,7 +73,6 @@ export class PlatformDomainService implements OnModuleInit {
     return row;
   }
 
-  // The key pair exists only once the seed has run, so the records to publish come from here.
   async dnsRecords(id: string): Promise<DnsRecordResponse[]> {
     return dnsRecordsFor(await this.require(id), this.config);
   }

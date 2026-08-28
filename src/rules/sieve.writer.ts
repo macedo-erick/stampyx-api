@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
@@ -22,8 +22,6 @@ export class SieveWriter {
 
   constructor(@Inject(CONFIG) private readonly config: Config) {}
 
-  // Content, not existence: a generator fix has to reach the mailboxes that already have a file,
-  // and checking only for a missing one left every existing mailbox on the old script.
   async isCurrent(target: SieveTarget, rules: readonly FolderRule[]): Promise<boolean> {
     try {
       const onDisk = await readFile(this.pathFor(target), 'utf8');
@@ -35,7 +33,10 @@ export class SieveWriter {
   }
 
   private scriptFor(rules: readonly FolderRule[]): string {
-    return generateSieve(rules, { notifyScript: 'notify-mail-received.sh' });
+    return generateSieve(rules, {
+      notifyScript: 'notify-mail-received.sh',
+      junkFolder: this.config.MAIL_JUNK_FOLDER,
+    });
   }
 
   pathFor(target: SieveTarget): string {
@@ -48,9 +49,8 @@ export class SieveWriter {
     const script = this.scriptFor(rules);
 
     await mkdir(dir, { recursive: true });
+    await chmod(dir, 0o775);
 
-    // Write then rename: Dovecot may be reading it, and a half-written file fails every delivery.
-    // The staged copy is compiled first, so a broken script never reaches the live path.
     const staging = `${file}.staged`;
     await writeFile(staging, script, 'utf8');
     await this.compile(staging);
@@ -63,9 +63,6 @@ export class SieveWriter {
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
 
-      // sievec reads Dovecot's config and in the API container is missing or cannot find one. That
-      // is an environment fact, not a bad script, and Dovecot compiles on first delivery anyway,
-      // so only a genuine rejection is worth refusing a rule save over.
       if (isUnavailable(reason)) {
         this.logger.warn(
           `sievec unavailable here, leaving ${file} for Dovecot to compile: ${reason}`,

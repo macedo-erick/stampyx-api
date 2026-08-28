@@ -8,7 +8,6 @@ import { type Alias, alias } from '../database/schema';
 export class AliasRepository {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
-  // A mailbox address is globally unique, so anything delivering to it aliases this one alone.
   async listForDestination(destination: string): Promise<Alias[]> {
     return this.db
       .select()

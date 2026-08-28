@@ -68,7 +68,6 @@ export class RuleService {
     const mailbox = await this.requireMailbox(accountId, mailboxId);
     const existing = await this.repository.listFor(mailboxId);
 
-    // A partial list leaves the omitted rules at position 0, reordering what nobody asked to reorder.
     if (
       ruleIds.length !== existing.length ||
       new Set(ruleIds).size !== ruleIds.length ||
@@ -96,7 +95,6 @@ export class RuleService {
     this.logger.log({ event: 'rule.deleted', ruleId: id, accountId });
   }
 
-  // Counted against what actually arrived, so a rule can be seen to catch something before saving.
   async preview(
     accountId: string,
     mailboxId: string,
@@ -161,7 +159,6 @@ function toResponse(row: FolderRule): RuleResponse {
   };
 }
 
-// The value is user text, so its own % and _ must not act as wildcards.
 function patternFor(operator: string, value: string): string {
   const literal = value.replace(/([%_\\])/g, '\\$1');
 

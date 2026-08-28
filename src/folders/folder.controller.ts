@@ -48,7 +48,6 @@ export class FolderController {
     return this.service.create(accountId, mailboxId, body);
   }
 
-  // The path is the identity and carries the separator, so it rides in the body, not the URL.
   @Put('rename')
   rename(
     @CurrentAccount() accountId: string,
